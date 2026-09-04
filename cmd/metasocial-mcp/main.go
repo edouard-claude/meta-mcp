@@ -1,0 +1,125 @@
+// Command metasocial-mcp is a multi-tenant remote MCP server for organic
+// Facebook Page and Instagram Business content.
+//
+// It exposes an MCP endpoint over Streamable HTTP at /mcp, protected by its
+// own OAuth 2.1 authorization server, and federates the end user login to
+// Facebook Login for Business.
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
+	"github.com/edouard/metasocial-mcp/internal/adapters/httpserver"
+	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
+	"github.com/edouard/metasocial-mcp/internal/config"
+)
+
+const (
+	// shutdownGrace is how long in-flight requests get on SIGTERM.
+	shutdownGrace = 10 * time.Second
+	// purgeInterval is how often expired codes, states and refresh tokens are
+	// swept out of the database.
+	purgeInterval = 10 * time.Minute
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "metasocial-mcp:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	logger := newLogger(cfg.LogFormat)
+
+	cipher, err := crypto.New(cfg.TokenCipherKey)
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	store, err := sqlite.New(ctx, cfg.DBPath, cipher)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	if err := store.PurgeExpired(ctx, time.Now()); err != nil {
+		return fmt.Errorf("purge au démarrage: %w", err)
+	}
+	go purgeLoop(ctx, store, logger)
+
+	handler := httpserver.New(httpserver.Handlers{
+		Health: store.Ping,
+	}, logger)
+
+	srv := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		logger.Info("serveur démarré", "addr", cfg.ListenAddr, "public_url", cfg.PublicURL)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("écoute HTTP: %w", err)
+	case <-ctx.Done():
+		logger.Info("arrêt demandé, fermeture en cours")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("arrêt du serveur: %w", err)
+	}
+	return nil
+}
+
+// purgeLoop sweeps expired short-lived rows until the context is cancelled.
+func purgeLoop(ctx context.Context, store *sqlite.Store, logger *slog.Logger) {
+	ticker := time.NewTicker(purgeInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := store.PurgeExpired(ctx, time.Now()); err != nil {
+				logger.Error("purge périodique", "error", err)
+			}
+		}
+	}
+}
+
+// newLogger builds the structured logger: JSON in production, text when
+// LOG_FORMAT=text makes local output readable.
+func newLogger(format string) *slog.Logger {
+	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+	if format == "text" {
+		return slog.New(slog.NewTextHandler(os.Stderr, opts))
+	}
+	return slog.New(slog.NewJSONHandler(os.Stderr, opts))
+}
