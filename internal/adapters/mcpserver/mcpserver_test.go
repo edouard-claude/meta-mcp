@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -238,12 +239,15 @@ func TestPageToolsUseTheirOwnPageToken(t *testing.T) {
 	if isErr {
 		t.Fatalf("erreur: %s", payload)
 	}
-	insights := decodeJSON[[]domain.Insight](t, payload)
-	if len(insights) != len(app.DefaultPageMetrics) {
-		t.Fatalf("%d métriques, attendu %d", len(insights), len(app.DefaultPageMetrics))
+	set := decodeJSON[domain.InsightSet](t, payload)
+	if len(set.Insights) != len(app.DefaultPageMetrics) {
+		t.Fatalf("%d métriques, attendu %d", len(set.Insights), len(app.DefaultPageMetrics))
 	}
-	if insights[0].Metric != app.DefaultPageMetrics[0] {
-		t.Fatalf("métriques par défaut non appliquées: %+v", insights[0])
+	if set.Insights[0].Metric != app.DefaultPageMetrics[0] {
+		t.Fatalf("métriques par défaut non appliquées: %+v", set.Insights[0])
+	}
+	if slices.Contains(app.DefaultPageMetrics, "page_impressions_unique") {
+		t.Fatal("page_impressions_unique est dépréciée et ne doit plus être demandée par défaut")
 	}
 
 	calls := h.graph.recorded()

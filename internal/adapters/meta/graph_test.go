@@ -2,8 +2,12 @@ package meta
 
 import (
 	"encoding/json"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 var (
@@ -15,15 +19,19 @@ func TestPageInsights(t *testing.T) {
 	g := newFakeGraph(t)
 	g.json("GET /page-1/insights", "page_insights.json", "")
 
-	insights, err := g.newTestClient().PageInsights(t.Context(), "PT", "page-1",
-		[]string{"page_impressions_unique", "page_follows"}, testSince, testUntil)
+	set, err := g.newTestClient().PageInsights(t.Context(), "PT", "page-1",
+		[]string{"page_post_engagements", "page_follows"}, testSince, testUntil)
 	if err != nil {
 		t.Fatalf("PageInsights: %v", err)
 	}
+	if len(set.Rejected) != 0 {
+		t.Fatalf("métriques refusées à tort: %v", set.Rejected)
+	}
+	insights := set.Insights
 	if len(insights) != 2 {
 		t.Fatalf("%d métriques", len(insights))
 	}
-	if insights[0].Metric != "page_impressions_unique" || insights[0].Period != "day" {
+	if insights[0].Metric != "page_post_engagements" || insights[0].Period != "day" {
 		t.Fatalf("métrique = %+v", insights[0])
 	}
 	if len(insights[0].Values) != 2 {
@@ -38,7 +46,7 @@ func TestPageInsights(t *testing.T) {
 	}
 
 	q := g.calls("/page-1/insights")[0].Query
-	if q.Get("metric") != "page_impressions_unique,page_follows" {
+	if q.Get("metric") != "page_post_engagements,page_follows" {
 		t.Fatalf("metric = %q", q.Get("metric"))
 	}
 	if q.Get("since") == "" || q.Get("until") == "" {
@@ -46,19 +54,63 @@ func TestPageInsights(t *testing.T) {
 	}
 }
 
-func TestPageInsightsMetadata(t *testing.T) {
+// TestPageInsightsRetriesMetricByMetric covers the case that motivated the
+// fallback: Meta answers #100 for the whole batch because one name is
+// deprecated, and the caller should still get the others.
+func TestPageInsightsRetriesMetricByMetric(t *testing.T) {
 	g := newFakeGraph(t)
-	g.json("GET /page-1/insights/metadata", "page_insights_metadata.json", "")
+	g.handle("GET /page-1/insights", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		metric := r.URL.Query().Get("metric")
+		if strings.Contains(metric, ",") || metric == "page_impressions_unique" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"(#100) metric[0] must be a valid insights metric","type":"OAuthException","code":100}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"name":"` + metric + `","period":"day","values":[{"value":7,"end_time":"2026-08-30T07:00:00+0000"}]}]}`))
+	})
 
-	metrics, err := g.newTestClient().PageInsightsMetadata(t.Context(), "PT", "page-1")
+	set, err := g.newTestClient().PageInsights(t.Context(), "PT", "page-1",
+		[]string{"page_impressions_unique", "page_follows", "page_views_total"}, testSince, testUntil)
 	if err != nil {
-		t.Fatalf("PageInsightsMetadata: %v", err)
+		t.Fatalf("PageInsights: %v", err)
 	}
-	if len(metrics) != 2 || metrics[0].Name != "page_impressions_unique" {
-		t.Fatalf("métriques = %+v", metrics)
+	if len(set.Insights) != 2 {
+		t.Fatalf("métriques retenues = %+v", set.Insights)
 	}
-	if metrics[1].Description == "" {
-		t.Fatalf("description absente: %+v", metrics[1])
+	if len(set.Rejected) != 1 || set.Rejected[0] != "page_impressions_unique" {
+		t.Fatalf("rejected = %v", set.Rejected)
+	}
+	// One batch attempt plus one call per metric.
+	if n := len(g.calls("/page-1/insights")); n != 4 {
+		t.Fatalf("%d appels, attendu 4", n)
+	}
+}
+
+// TestPageInsightsDoesNotSwallowAuthErrors makes sure the fallback only
+// tolerates unsupported metrics, never an expired token.
+func TestPageInsightsDoesNotSwallowAuthErrors(t *testing.T) {
+	g := newFakeGraph(t)
+	first := true
+	g.handle("GET /page-1/insights", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		if first {
+			first = false
+			_, _ = w.Write([]byte(`{"error":{"message":"(#100) bad metric","type":"OAuthException","code":100}}`))
+			return
+		}
+		_, _ = w.Write([]byte(g.fixture("error_190.json")))
+	})
+
+	_, err := g.newTestClient().PageInsights(t.Context(), "PT", "page-1",
+		[]string{"a", "b"}, testSince, testUntil)
+	if err == nil {
+		t.Fatal("une erreur d'autorisation a été avalée")
+	}
+	ge, ok := domain.AsGraphError(err)
+	if !ok || !ge.IsAuth() {
+		t.Fatalf("erreur = %v", err)
 	}
 }
 
@@ -114,26 +166,75 @@ func TestIGAccountInsightsNormalizesTotalValue(t *testing.T) {
 	g := newFakeGraph(t)
 	g.json("GET /ig-1/insights", "ig_insights.json", "")
 
-	insights, err := g.newTestClient().IGAccountInsights(t.Context(), "PT", "ig-1",
-		[]string{"reach", "follower_count"}, testSince, testUntil)
+	set, err := g.newTestClient().IGAccountInsights(t.Context(), "PT", "ig-1",
+		[]string{"reach", "profile_views"}, testSince, testUntil)
 	if err != nil {
 		t.Fatalf("IGAccountInsights: %v", err)
 	}
-	if len(insights) != 2 {
-		t.Fatalf("%d métriques", len(insights))
+	if len(set.Insights) != 2 {
+		t.Fatalf("%d métriques", len(set.Insights))
 	}
 	// Instagram returns total_value, which must land in Values like Facebook.
-	if len(insights[0].Values) != 1 {
-		t.Fatalf("valeurs = %+v", insights[0])
+	if len(set.Insights[0].Values) != 1 {
+		t.Fatalf("valeurs = %+v", set.Insights[0])
 	}
 	var value int64
-	if err := json.Unmarshal(insights[0].Values[0].Value, &value); err != nil || value != 4210 {
-		t.Fatalf("valeur = %s (err %v)", insights[0].Values[0].Value, err)
+	if err := json.Unmarshal(set.Insights[0].Values[0].Value, &value); err != nil || value != 4210 {
+		t.Fatalf("valeur = %s (err %v)", set.Insights[0].Values[0].Value, err)
 	}
 
 	q := g.calls("/ig-1/insights")[0].Query
 	if q.Get("metric_type") != "total_value" || q.Get("period") != "day" {
 		t.Fatalf("paramètres = %v", q)
+	}
+}
+
+// TestIGAccountInsightsSplitsFollowerCount pins the reason the client makes
+// two requests: follower_count is refused under metric_type=total_value.
+func TestIGAccountInsightsSplitsFollowerCount(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /ig-1/insights", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		q := r.URL.Query()
+		metric := q.Get("metric")
+		if strings.Contains(metric, "follower_count") && q.Get("metric_type") != "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"(#100) follower_count does not support metric_type=total_value","type":"OAuthException","code":100}}`))
+			return
+		}
+		if metric == "follower_count" {
+			_, _ = w.Write([]byte(`{"data":[{"name":"follower_count","period":"day","values":[{"value":38,"end_time":"2026-08-30T07:00:00+0000"}]}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(g.fixture("ig_insights.json")))
+	})
+
+	set, err := g.newTestClient().IGAccountInsights(t.Context(), "PT", "ig-1",
+		[]string{"reach", "follower_count"}, testSince, testUntil)
+	if err != nil {
+		t.Fatalf("IGAccountInsights: %v", err)
+	}
+	if len(set.Rejected) != 0 {
+		t.Fatalf("follower_count refusée alors qu'elle doit passer à part: %v", set.Rejected)
+	}
+
+	var sawFollowerAlone bool
+	for _, call := range g.calls("/ig-1/insights") {
+		if call.Query.Get("metric") == "follower_count" {
+			sawFollowerAlone = true
+			if call.Query.Get("metric_type") != "" {
+				t.Fatalf("follower_count demandée avec metric_type: %v", call.Query)
+			}
+			if call.Query.Get("period") != "day" {
+				t.Fatalf("follower_count sans period=day: %v", call.Query)
+			}
+		}
+	}
+	if !sawFollowerAlone {
+		t.Fatal("follower_count n'a pas été demandée séparément")
+	}
+	if len(set.Insights) == 0 {
+		t.Fatal("aucune métrique renvoyée")
 	}
 }
 

@@ -62,9 +62,9 @@ func (f *fakeGraph) Accounts(_ context.Context, token string) ([]domain.Page, er
 	}, nil
 }
 
-func (f *fakeGraph) PageInsights(_ context.Context, token, pageID string, metrics []string, _, _ time.Time) ([]domain.Insight, error) {
+func (f *fakeGraph) PageInsights(_ context.Context, token, pageID string, metrics []string, _, _ time.Time) (domain.InsightSet, error) {
 	if err := f.record("PageInsights", token, pageID); err != nil {
-		return nil, err
+		return domain.InsightSet{}, err
 	}
 	out := make([]domain.Insight, 0, len(metrics))
 	for _, m := range metrics {
@@ -73,14 +73,7 @@ func (f *fakeGraph) PageInsights(_ context.Context, token, pageID string, metric
 			Values: []domain.InsightValue{{EndTime: "2026-09-01T07:00:00+0000", Value: json.RawMessage(`42`)}},
 		})
 	}
-	return out, nil
-}
-
-func (f *fakeGraph) PageInsightsMetadata(_ context.Context, token, pageID string) ([]domain.InsightMeta, error) {
-	if err := f.record("PageInsightsMetadata", token, pageID); err != nil {
-		return nil, err
-	}
-	return []domain.InsightMeta{{Name: "page_impressions_unique", Period: "day"}}, nil
+	return domain.InsightSet{Insights: out}, nil
 }
 
 func (f *fakeGraph) PagePosts(_ context.Context, token, pageID string, _ time.Time, _ int) ([]domain.Post, error) {
@@ -111,16 +104,16 @@ func (f *fakeGraph) ReplyToComment(_ context.Context, token, commentID, _ string
 	return commentID + "_reply", nil
 }
 
-func (f *fakeGraph) IGAccountInsights(_ context.Context, token, igUserID string, metrics []string, _, _ time.Time) ([]domain.Insight, error) {
+func (f *fakeGraph) IGAccountInsights(_ context.Context, token, igUserID string, metrics []string, _, _ time.Time) (domain.InsightSet, error) {
 	if err := f.record("IGAccountInsights", token, igUserID); err != nil {
-		return nil, err
+		return domain.InsightSet{}, err
 	}
 	out := make([]domain.Insight, 0, len(metrics))
 	for _, m := range metrics {
 		out = append(out, domain.Insight{Metric: m, Period: "day",
 			Values: []domain.InsightValue{{Value: json.RawMessage(`7`)}}})
 	}
-	return out, nil
+	return domain.InsightSet{Insights: out}, nil
 }
 
 func (f *fakeGraph) IGFollowerDemographics(_ context.Context, token, igUserID, breakdown string) ([]domain.Breakdown, error) {

@@ -26,14 +26,14 @@ type IGInsightsInput struct {
 
 // IGAccountInsights reads the account level metrics of the Instagram account
 // linked to a page.
-func (s *Service) IGAccountInsights(ctx context.Context, tenantID string, in IGInsightsInput) ([]domain.Insight, error) {
+func (s *Service) IGAccountInsights(ctx context.Context, tenantID string, in IGInsightsInput) (domain.InsightSet, error) {
 	page, err := s.igPage(ctx, tenantID, in.PageID)
 	if err != nil {
-		return nil, err
+		return domain.InsightSet{}, err
 	}
 	since, until, err := s.dateWindow(in.Since, in.Until)
 	if err != nil {
-		return nil, err
+		return domain.InsightSet{}, err
 	}
 	return s.graph.IGAccountInsights(ctx, page.PageToken, page.IGUserID,
 		metricsOrDefault(in.Metrics, DefaultIGMetrics), since, until)

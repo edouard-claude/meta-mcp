@@ -21,13 +21,20 @@ type InsightValue struct {
 	Value   json.RawMessage `json:"value"`
 }
 
-// InsightMeta describes a metric available on a page, as returned by
-// /{page-id}/insights/metadata.
+// InsightSet is the answer of an insights query. Meta rejects a whole batch
+// when a single metric name is unsupported, so metrics that could not be read
+// are reported in Rejected instead of failing the call.
+type InsightSet struct {
+	Insights []Insight `json:"insights"`
+	Rejected []string  `json:"rejected,omitempty"`
+}
+
+// InsightMeta describes a metric this server knows how to request.
 type InsightMeta struct {
-	Name        string   `json:"name"`
-	Period      string   `json:"period,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Periods     []string `json:"periods,omitempty"`
+	Name        string `json:"name"`
+	Period      string `json:"period,omitempty"`
+	Description string `json:"description,omitempty"`
+	Surface     string `json:"surface,omitempty"`
 }
 
 // Post is a Facebook Page post with its organic insights flattened.

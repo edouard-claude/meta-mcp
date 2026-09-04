@@ -296,7 +296,7 @@ Ask *"list my pages"*: `list_pages` should answer with the Pages of that account
 | `list_pages` | Known Pages and their linked Instagram account, straight from the store |
 | `sync_pages` | Re-reads the Pages from Meta and replaces the list |
 | `page_insights` | Daily organic metrics of a Page over a window |
-| `page_insights_metadata` | Metrics Meta currently exposes for that Page |
+| `page_insights_metadata` | Catalogue of metric names the server knows how to request |
 | `page_posts` | Recent posts with unique impressions, clicks, reactions |
 | `page_post_comments` | Comments on a post |
 | `ig_account_insights` | Reach, views, profile views, engaged accounts, interactions, followers |
@@ -305,7 +305,15 @@ Ask *"list my pages"*: `list_pages` should answer with the Pages of that account
 | `ig_media_comments` | Comments on an Instagram media |
 | `reconnect_url` | Single-use link to re-authorize Facebook |
 
-`since` and `until` are `YYYY-MM-DD` and default to the last 28 days.
+`since` and `until` are `YYYY-MM-DD`. The insights tools default to the last 28 days;
+`page_posts` and `ig_media` apply no lower bound at all when `since` is absent, so a
+page that publishes twice a month does not come back empty.
+
+Meta rejects a whole insights batch when one metric name is unsupported on that
+object. Rather than failing, the server retries metric by metric and returns what it
+could read, listing the rest under `rejected`. `page_insights_metadata` is a
+maintained catalogue in the code, not a live capability check: the
+`/insights/metadata` endpoint no longer answers, so `rejected` is the real signal.
 
 ### Write
 

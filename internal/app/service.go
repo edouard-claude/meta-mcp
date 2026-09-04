@@ -184,6 +184,16 @@ func (s *Service) dateWindow(since, until string) (time.Time, time.Time, error) 
 	return start, end, nil
 }
 
+// optionalDay parses a bound that may be absent. An empty value yields the
+// zero time, which the Graph client leaves out of the query entirely rather
+// than defaulting to a window.
+func optionalDay(value, name string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	return parseDay(value, name)
+}
+
 func parseDay(value, name string) (time.Time, error) {
 	day, err := time.ParseInLocation(dayLayout, value, time.UTC)
 	if err != nil {

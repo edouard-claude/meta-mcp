@@ -25,7 +25,9 @@ func (s *Service) IGMedia(ctx context.Context, tenantID string, in IGMediaInput)
 	if err != nil {
 		return nil, err
 	}
-	since, _, err := s.dateWindow(in.Since, "")
+	// As for page_posts, no since means no lower bound rather than the 28
+	// day default, so a rarely posting account does not come back empty.
+	since, err := optionalDay(in.Since, "since")
 	if err != nil {
 		return nil, err
 	}

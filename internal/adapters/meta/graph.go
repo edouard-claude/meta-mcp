@@ -73,35 +73,73 @@ func decodeInsights(items []json.RawMessage) ([]domain.Insight, error) {
 	return out, nil
 }
 
-// PageInsights reads the organic metrics of a Facebook Page over a window.
-func (c *Client) PageInsights(ctx context.Context, pageToken, pageID string, metrics []string, since, until time.Time) ([]domain.Insight, error) {
-	params := unixParams(url.Values{
-		"metric": {strings.Join(metrics, ",")},
-		"period": {"day"},
-	}, since, until)
+// codeUnsupportedMetric is what Meta answers when one name in the metric list
+// is unknown, deprecated, or not available on that object. It condemns the
+// whole batch, which is why insightsWithFallback exists.
+const codeUnsupportedMetric = 100
 
-	items, err := c.collect(ctx, pageToken, pageID+"/insights", params, 0)
+// PageInsights reads the organic metrics of a Facebook Page over a window.
+func (c *Client) PageInsights(ctx context.Context, pageToken, pageID string, metrics []string, since, until time.Time) (domain.InsightSet, error) {
+	base := unixParams(url.Values{"period": {"day"}}, since, until)
+	set, err := c.insightsWithFallback(ctx, pageToken, pageID+"/insights", base, metrics)
 	if err != nil {
-		return nil, fmt.Errorf("statistiques de la page: %w", err)
+		return domain.InsightSet{}, fmt.Errorf("statistiques de la page: %w", err)
 	}
-	return decodeInsights(items)
+	return set, nil
 }
 
-// PageInsightsMetadata lists the metrics available on a page.
-func (c *Client) PageInsightsMetadata(ctx context.Context, pageToken, pageID string) ([]domain.InsightMeta, error) {
-	items, err := c.collect(ctx, pageToken, pageID+"/insights/metadata", url.Values{}, 0)
-	if err != nil {
-		return nil, fmt.Errorf("métriques disponibles: %w", err)
+// insightsWithFallback asks for every metric at once, and falls back to one
+// request per metric when Meta rejects the batch over a single bad name. The
+// metrics that still fail are reported as rejected rather than failing the
+// whole call, so one deprecated name never costs the caller the rest.
+func (c *Client) insightsWithFallback(ctx context.Context, token, path string, base url.Values, metrics []string) (domain.InsightSet, error) {
+	if len(metrics) == 0 {
+		return domain.InsightSet{Insights: []domain.Insight{}}, nil
 	}
-	out := make([]domain.InsightMeta, 0, len(items))
-	for _, raw := range items {
-		var meta domain.InsightMeta
-		if err := json.Unmarshal(raw, &meta); err != nil {
-			return nil, fmt.Errorf("décodage d'une métrique disponible: %w", err)
+
+	set, err := c.insights(ctx, token, path, base, metrics)
+	if err == nil {
+		return set, nil
+	}
+	if ge, ok := domain.AsGraphError(err); !ok || ge.Code != codeUnsupportedMetric {
+		return domain.InsightSet{}, err
+	}
+
+	out := domain.InsightSet{Insights: []domain.Insight{}}
+	for _, metric := range metrics {
+		one, err := c.insights(ctx, token, path, base, []string{metric})
+		if err == nil {
+			out.Insights = append(out.Insights, one.Insights...)
+			continue
 		}
-		out = append(out, meta)
+		// Only an unsupported metric is skipped. An expired token or a
+		// quota is a real failure and must reach the caller.
+		if ge, ok := domain.AsGraphError(err); ok && ge.Code == codeUnsupportedMetric {
+			out.Rejected = append(out.Rejected, metric)
+			continue
+		}
+		return domain.InsightSet{}, err
 	}
 	return out, nil
+}
+
+// insights performs one /insights request for the given metric list.
+func (c *Client) insights(ctx context.Context, token, path string, base url.Values, metrics []string) (domain.InsightSet, error) {
+	params := url.Values{}
+	for k, v := range base {
+		params[k] = v
+	}
+	params.Set("metric", strings.Join(metrics, ","))
+
+	items, err := c.collect(ctx, token, path, params, 0)
+	if err != nil {
+		return domain.InsightSet{}, err
+	}
+	insights, err := decodeInsights(items)
+	if err != nil {
+		return domain.InsightSet{}, err
+	}
+	return domain.InsightSet{Insights: insights}, nil
 }
 
 // postItem is one entry of /{page-id}/posts with its insights inlined.
@@ -207,19 +245,54 @@ func (c *Client) comments(ctx context.Context, token, path, fields string, limit
 	return out, nil
 }
 
-// IGAccountInsights reads the account level Instagram metrics.
-func (c *Client) IGAccountInsights(ctx context.Context, pageToken, igUserID string, metrics []string, since, until time.Time) ([]domain.Insight, error) {
-	params := unixParams(url.Values{
-		"metric":      {strings.Join(metrics, ",")},
-		"period":      {"day"},
-		"metric_type": {"total_value"},
-	}, since, until)
+// timeSeriesIGMetrics are the Instagram metrics that Meta refuses under
+// metric_type=total_value and only serves as a plain daily series.
+var timeSeriesIGMetrics = map[string]bool{
+	"follower_count": true,
+}
 
-	items, err := c.collect(ctx, pageToken, igUserID+"/insights", params, 0)
-	if err != nil {
-		return nil, fmt.Errorf("statistiques Instagram: %w", err)
+// IGAccountInsights reads the account level Instagram metrics.
+//
+// The metrics do not all live under the same query shape: most need
+// metric_type=total_value, while follower_count is rejected with it. They are
+// therefore split into two requests and merged back, so the caller never has
+// to know about the distinction.
+func (c *Client) IGAccountInsights(ctx context.Context, pageToken, igUserID string, metrics []string, since, until time.Time) (domain.InsightSet, error) {
+	var totals, series []string
+	for _, m := range metrics {
+		if timeSeriesIGMetrics[m] {
+			series = append(series, m)
+		} else {
+			totals = append(totals, m)
+		}
 	}
-	return decodeInsights(items)
+
+	path := igUserID + "/insights"
+	out := domain.InsightSet{Insights: []domain.Insight{}}
+
+	if len(totals) > 0 {
+		base := unixParams(url.Values{
+			"period":      {"day"},
+			"metric_type": {"total_value"},
+		}, since, until)
+		set, err := c.insightsWithFallback(ctx, pageToken, path, base, totals)
+		if err != nil {
+			return domain.InsightSet{}, fmt.Errorf("statistiques Instagram: %w", err)
+		}
+		out.Insights = append(out.Insights, set.Insights...)
+		out.Rejected = append(out.Rejected, set.Rejected...)
+	}
+
+	if len(series) > 0 {
+		base := unixParams(url.Values{"period": {"day"}}, since, until)
+		set, err := c.insightsWithFallback(ctx, pageToken, path, base, series)
+		if err != nil {
+			return domain.InsightSet{}, fmt.Errorf("statistiques Instagram: %w", err)
+		}
+		out.Insights = append(out.Insights, set.Insights...)
+		out.Rejected = append(out.Rejected, set.Rejected...)
+	}
+	return out, nil
 }
 
 // IGFollowerDemographics reads one demographic breakdown of the followers.

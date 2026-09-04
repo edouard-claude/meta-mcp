@@ -1,9 +1,9 @@
 {
   "data": [
     {
-      "name": "page_impressions_unique",
+      "name": "page_post_engagements",
       "period": "day",
-      "title": "Daily Total Reach",
+      "title": "Daily Page Engaged Users",
       "values": [
         {"value": 1234, "end_time": "2026-08-30T07:00:00+0000"},
         {"value": 987, "end_time": "2026-08-31T07:00:00+0000"}

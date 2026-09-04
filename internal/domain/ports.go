@@ -80,8 +80,7 @@ type GraphClient interface {
 
 	// --- Facebook Page, read ---
 
-	PageInsights(ctx context.Context, pageToken, pageID string, metrics []string, since, until time.Time) ([]Insight, error)
-	PageInsightsMetadata(ctx context.Context, pageToken, pageID string) ([]InsightMeta, error)
+	PageInsights(ctx context.Context, pageToken, pageID string, metrics []string, since, until time.Time) (InsightSet, error)
 	PagePosts(ctx context.Context, pageToken, pageID string, since time.Time, limit int) ([]Post, error)
 	PostComments(ctx context.Context, pageToken, postID string, limit int) ([]Comment, error)
 
@@ -92,7 +91,7 @@ type GraphClient interface {
 
 	// --- Instagram, read ---
 
-	IGAccountInsights(ctx context.Context, pageToken, igUserID string, metrics []string, since, until time.Time) ([]Insight, error)
+	IGAccountInsights(ctx context.Context, pageToken, igUserID string, metrics []string, since, until time.Time) (InsightSet, error)
 	IGFollowerDemographics(ctx context.Context, pageToken, igUserID, breakdown string) ([]Breakdown, error)
 	IGMedia(ctx context.Context, pageToken, igUserID string, since time.Time, limit int) ([]Media, error)
 	IGMediaComments(ctx context.Context, pageToken, mediaID string, limit int) ([]Comment, error)

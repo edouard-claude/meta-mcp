@@ -47,20 +47,13 @@ func (f *fakeGraph) last() graphCall {
 	return f.calls[len(f.calls)-1]
 }
 
-func (f *fakeGraph) PageInsights(_ context.Context, token, pageID string, metrics []string, since, until time.Time) ([]domain.Insight, error) {
+func (f *fakeGraph) PageInsights(_ context.Context, token, pageID string, metrics []string, since, until time.Time) (domain.InsightSet, error) {
 	if err := f.record(graphCall{Method: "PageInsights", Token: token, Object: pageID,
 		Metrics: metrics, Since: since, Until: until}); err != nil {
-		return nil, err
+		return domain.InsightSet{}, err
 	}
-	return []domain.Insight{{Metric: metrics[0], Period: "day",
-		Values: []domain.InsightValue{{Value: json.RawMessage(`1`)}}}}, nil
-}
-
-func (f *fakeGraph) PageInsightsMetadata(_ context.Context, token, pageID string) ([]domain.InsightMeta, error) {
-	if err := f.record(graphCall{Method: "PageInsightsMetadata", Token: token, Object: pageID}); err != nil {
-		return nil, err
-	}
-	return []domain.InsightMeta{{Name: "page_views_total"}}, nil
+	return domain.InsightSet{Insights: []domain.Insight{{Metric: metrics[0], Period: "day",
+		Values: []domain.InsightValue{{Value: json.RawMessage(`1`)}}}}}, nil
 }
 
 func (f *fakeGraph) PagePosts(_ context.Context, token, pageID string, since time.Time, limit int) ([]domain.Post, error) {
@@ -92,12 +85,12 @@ func (f *fakeGraph) ReplyToComment(_ context.Context, token, commentID, _ string
 	return commentID + "_r", nil
 }
 
-func (f *fakeGraph) IGAccountInsights(_ context.Context, token, igUserID string, metrics []string, since, until time.Time) ([]domain.Insight, error) {
+func (f *fakeGraph) IGAccountInsights(_ context.Context, token, igUserID string, metrics []string, since, until time.Time) (domain.InsightSet, error) {
 	if err := f.record(graphCall{Method: "IGAccountInsights", Token: token, Object: igUserID,
 		Metrics: metrics, Since: since, Until: until}); err != nil {
-		return nil, err
+		return domain.InsightSet{}, err
 	}
-	return []domain.Insight{{Metric: metrics[0]}}, nil
+	return domain.InsightSet{Insights: []domain.Insight{{Metric: metrics[0]}}}, nil
 }
 
 func (f *fakeGraph) IGFollowerDemographics(_ context.Context, token, igUserID, breakdown string) ([]domain.Breakdown, error) {
@@ -261,11 +254,16 @@ func TestDateWindowErrors(t *testing.T) {
 func TestPageInsightsMetadataAndPosts(t *testing.T) {
 	svc, _, graph, _ := newServiceHarness(t)
 
-	if _, err := svc.PageInsightsMetadata(t.Context(), "tenant-a", "page-a"); err != nil {
+	// The catalogue is served from the code: no Graph call at all.
+	metrics, err := svc.PageInsightsMetadata(t.Context(), "tenant-a", "page-a")
+	if err != nil {
 		t.Fatalf("PageInsightsMetadata: %v", err)
 	}
-	if graph.last().Method != "PageInsightsMetadata" {
-		t.Fatalf("appel = %+v", graph.last())
+	if len(metrics) != len(KnownMetrics) {
+		t.Fatalf("%d métriques, attendu %d", len(metrics), len(KnownMetrics))
+	}
+	if len(graph.calls) != 0 {
+		t.Fatalf("appel Graph pour une liste statique: %+v", graph.calls)
 	}
 
 	if _, err := svc.PagePosts(t.Context(), "tenant-a", PagePostsInput{PageID: "page-a"}); err != nil {
@@ -634,5 +632,72 @@ func TestClampLimit(t *testing.T) {
 		if got := clampLimit(tc.in, tc.def, tc.max); got != tc.want {
 			t.Errorf("clampLimit(%d) = %d, attendu %d", tc.in, got, tc.want)
 		}
+	}
+}
+
+// TestPostListingsHaveNoImplicitLowerBound pins the fix for pages that publish
+// rarely: without an explicit since, no lower bound is sent at all, so the
+// 28 day default cannot hide older posts.
+func TestPostListingsHaveNoImplicitLowerBound(t *testing.T) {
+	svc, _, graph, _ := newServiceHarness(t)
+
+	if _, err := svc.PagePosts(t.Context(), "tenant-a", PagePostsInput{PageID: "page-a"}); err != nil {
+		t.Fatalf("PagePosts: %v", err)
+	}
+	if !graph.last().Since.IsZero() {
+		t.Fatalf("since = %v, attendu aucune borne", graph.last().Since)
+	}
+
+	if _, err := svc.IGMedia(t.Context(), "tenant-a", IGMediaInput{PageID: "page-a"}); err != nil {
+		t.Fatalf("IGMedia: %v", err)
+	}
+	if !graph.last().Since.IsZero() {
+		t.Fatalf("since = %v, attendu aucune borne", graph.last().Since)
+	}
+
+	// An explicit since is still honoured.
+	if _, err := svc.PagePosts(t.Context(), "tenant-a",
+		PagePostsInput{PageID: "page-a", Since: "2026-08-01"}); err != nil {
+		t.Fatalf("PagePosts: %v", err)
+	}
+	if got := graph.last().Since.Format(dayLayout); got != "2026-08-01" {
+		t.Fatalf("since = %s", got)
+	}
+	if _, err := svc.PagePosts(t.Context(), "tenant-a",
+		PagePostsInput{PageID: "page-a", Since: "le 1er août"}); err == nil {
+		t.Fatal("une date invalide a été acceptée")
+	}
+}
+
+func TestKnownMetricsExcludeDeprecatedAndInstagramWithoutAccount(t *testing.T) {
+	svc, _, _, _ := newServiceHarness(t)
+
+	for _, m := range KnownMetrics {
+		if m.Name == "page_impressions_unique" {
+			t.Fatal("le catalogue propose une métrique dépréciée")
+		}
+		if m.Surface != "page" && m.Surface != "instagram" {
+			t.Fatalf("surface inattendue: %+v", m)
+		}
+	}
+
+	// tenant-b's page has no Instagram account, so the Instagram metrics
+	// would only be noise.
+	metrics, err := svc.PageInsightsMetadata(t.Context(), "tenant-b", "page-b")
+	if err != nil {
+		t.Fatalf("PageInsightsMetadata: %v", err)
+	}
+	if len(metrics) == 0 || len(metrics) >= len(KnownMetrics) {
+		t.Fatalf("%d métriques sur %d", len(metrics), len(KnownMetrics))
+	}
+	for _, m := range metrics {
+		if m.Surface == "instagram" {
+			t.Fatalf("métrique Instagram proposée sans compte lié: %+v", m)
+		}
+	}
+
+	// And it stays tenant-scoped like every other tool.
+	if _, err := svc.PageInsightsMetadata(t.Context(), "tenant-a", "page-b"); !errors.Is(err, domain.ErrUnknownPage) {
+		t.Fatalf("erreur = %v", err)
 	}
 }

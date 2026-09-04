@@ -26,14 +26,14 @@ func (d *deps) registerReadTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "page_insights",
 		Title:       "Statistiques d'une page",
-		Description: "Statistiques organiques quotidiennes d'une Page Facebook sur une période. Par défaut : impressions uniques, engagements, nouveaux abonnés, abonnés et vues de la page sur les 28 derniers jours.",
+		Description: "Statistiques organiques quotidiennes d'une Page Facebook sur une période. Par défaut : engagements, nouveaux abonnés, abonnés et vues de la page sur les 28 derniers jours. Les métriques que Meta refuse sont listées dans le champ rejected au lieu de faire échouer l'appel.",
 		Annotations: readOnly(),
 	}, d.toolPageInsights)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "page_insights_metadata",
 		Title:       "Métriques disponibles",
-		Description: "Liste les métriques que Meta expose actuellement pour cette page, avec leurs périodes. Utile quand page_insights refuse une métrique.",
+		Description: "Catalogue des métriques que ce serveur sait demander, avec leur période et leur surface (page ou instagram). C'est une liste de départ maintenue dans le code, pas une capacité lue chez Meta : seul page_insights dit vraiment ce qui passe, via son champ rejected.",
 		Annotations: readOnly(),
 	}, d.toolPageInsightsMetadata)
 
@@ -54,7 +54,7 @@ func (d *deps) registerReadTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "ig_account_insights",
 		Title:       "Statistiques Instagram",
-		Description: "Statistiques du compte Instagram professionnel lié à une page : couverture, vues, visites de profil, comptes engagés, interactions et abonnés.",
+		Description: "Statistiques du compte Instagram professionnel lié à une page : couverture, vues, visites de profil, comptes engagés, interactions et abonnés. Les métriques que Meta refuse sont listées dans le champ rejected au lieu de faire échouer l'appel.",
 		Annotations: readOnly(),
 	}, d.toolIGAccountInsights)
 
@@ -125,7 +125,7 @@ type PageInsightsArgs struct {
 	PageID  string   `json:"page_id" jsonschema:"Identifiant de la Page Facebook, obtenu via list_pages."`
 	Since   string   `json:"since,omitempty" jsonschema:"Début de la période, au format AAAA-MM-JJ. Par défaut 28 jours avant until."`
 	Until   string   `json:"until,omitempty" jsonschema:"Fin de la période, au format AAAA-MM-JJ. Par défaut aujourd'hui."`
-	Metrics []string `json:"metrics,omitempty" jsonschema:"Métriques Meta à lire. Par défaut: page_impressions_unique, page_post_engagements, page_daily_follows, page_follows, page_views_total. Utilisez page_insights_metadata pour connaître les métriques disponibles."`
+	Metrics []string `json:"metrics,omitempty" jsonschema:"Métriques Meta à lire. Par défaut: page_post_engagements, page_daily_follows, page_follows, page_views_total. Utilisez page_insights_metadata pour des noms de métriques connus."`
 }
 
 func (d *deps) toolPageInsights(ctx context.Context, req *mcp.CallToolRequest, args PageInsightsArgs) (*mcp.CallToolResult, any, error) {
@@ -169,7 +169,7 @@ func (d *deps) toolPageInsightsMetadata(ctx context.Context, req *mcp.CallToolRe
 // PagePostsArgs are the arguments of page_posts.
 type PagePostsArgs struct {
 	PageID string `json:"page_id" jsonschema:"Identifiant de la Page Facebook, obtenu via list_pages."`
-	Since  string `json:"since,omitempty" jsonschema:"Ne remonter que les publications postérieures à cette date, au format AAAA-MM-JJ. Par défaut les 28 derniers jours."`
+	Since  string `json:"since,omitempty" jsonschema:"Ne remonter que les publications postérieures à cette date, au format AAAA-MM-JJ. Absent = aucune borne basse, les plus récentes d'abord dans la limite de limit."`
 	Limit  int    `json:"limit,omitempty" jsonschema:"Nombre maximum de publications, 25 par défaut, 100 au maximum."`
 }
 
@@ -266,7 +266,7 @@ func (d *deps) toolIGFollowerDemographics(ctx context.Context, req *mcp.CallTool
 // IGMediaArgs are the arguments of ig_media.
 type IGMediaArgs struct {
 	PageID string `json:"page_id" jsonschema:"Page Facebook dont le compte Instagram professionnel est lié."`
-	Since  string `json:"since,omitempty" jsonschema:"Ne remonter que les publications postérieures à cette date, au format AAAA-MM-JJ. Par défaut les 28 derniers jours."`
+	Since  string `json:"since,omitempty" jsonschema:"Ne remonter que les publications postérieures à cette date, au format AAAA-MM-JJ. Absent = aucune borne basse, les plus récentes d'abord dans la limite de limit."`
 	Limit  int    `json:"limit,omitempty" jsonschema:"Nombre maximum de publications, 25 par défaut, 100 au maximum."`
 }
 
