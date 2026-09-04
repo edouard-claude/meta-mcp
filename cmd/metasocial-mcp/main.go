@@ -21,7 +21,9 @@ import (
 	"github.com/edouard/metasocial-mcp/internal/adapters/clock"
 	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
 	"github.com/edouard/metasocial-mcp/internal/adapters/httpserver"
+	"github.com/edouard/metasocial-mcp/internal/adapters/meta"
 	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
+	"github.com/edouard/metasocial-mcp/internal/app"
 	"github.com/edouard/metasocial-mcp/internal/config"
 )
 
@@ -75,12 +77,33 @@ func run() error {
 		RefreshTokenTTL: cfg.RefreshTokenTTL,
 	}, logger)
 
+	graph := meta.NewClient(meta.Options{
+		AppID:       cfg.MetaAppID,
+		AppSecret:   cfg.MetaAppSecret,
+		Version:     cfg.GraphVersion,
+		RedirectURI: cfg.MetaRedirectURI(),
+		Scopes:      cfg.MetaScopes,
+	})
+
+	login := app.NewLoginService(store, graph, clock.System{}, cfg.IsMetaUserAllowed)
+
+	metaHandlers := meta.NewHandlers(login, auth, meta.HandlerOptions{
+		PublicURL:   cfg.PublicURL,
+		RedirectURI: cfg.MetaRedirectURI(),
+		AppSecret:   cfg.MetaAppSecret,
+	}, logger)
+
 	handler := httpserver.New(httpserver.Handlers{
 		ProtectedResourceMetadata: auth.ProtectedResourceMetadataHandler(),
 		AuthServerMetadata:        auth.AuthServerMetadataHandler(),
 		Register:                  auth.RegisterHandler(),
 		Authorize:                 auth.AuthorizeHandler(),
 		Token:                     auth.TokenHandler(),
+		MetaLogin:                 metaHandlers.LoginHandler(),
+		MetaCallback:              metaHandlers.CallbackHandler(),
+		MetaDataDeletion:          metaHandlers.DataDeletionHandler(),
+		MetaDeauthorize:           metaHandlers.DeauthorizeHandler(),
+		Privacy:                   metaHandlers.PrivacyHandler(),
 		Health:                    store.Ping,
 	}, logger)
 

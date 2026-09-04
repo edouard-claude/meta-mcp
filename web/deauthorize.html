@@ -1,0 +1,12 @@
+{{define "content"}}
+<h1>Suppression des données</h1>
+<p>
+  Votre demande a été enregistrée. Les jetons d'accès, les pages et les
+  sessions liés à votre compte Facebook ont été supprimés de ce serveur.
+</p>
+{{if .ConfirmationCode}}<p>Code de confirmation : <code>{{.ConfirmationCode}}</code></p>{{end}}
+<p class="muted">
+  Pour utiliser à nouveau le service, reconnectez votre compte depuis votre
+  client MCP.
+</p>
+{{end}}

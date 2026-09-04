@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 // ErrNotFound is returned by the stores when a row does not exist, or exists
@@ -34,6 +35,8 @@ type GraphError struct {
 	Type       string
 	Message    string
 	TraceID    string
+	// RetryAfter is the delay Meta asked us to wait, when it sent one.
+	RetryAfter time.Duration
 }
 
 func (e *GraphError) Error() string {

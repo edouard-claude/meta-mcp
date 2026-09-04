@@ -1,0 +1,8 @@
+{
+  "error": {
+    "message": "(#10) This endpoint requires the 'read_insights' permission",
+    "type": "OAuthException",
+    "code": 10,
+    "fbtrace_id": "PpQqRr456"
+  }
+}

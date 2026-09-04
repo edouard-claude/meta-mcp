@@ -56,11 +56,10 @@ type TenantStore interface {
 	Close() error
 }
 
-// GraphClient is everything the application needs from the Meta Graph API.
-// Implementations translate transport failures into *GraphError.
-type GraphClient interface {
-	// --- OAuth ---
-
+// MetaOAuthClient is the slice of the Graph API the login flow needs. It is a
+// port of its own so the login use case, and its tests, never have to know
+// about insights or publishing.
+type MetaOAuthClient interface {
 	// AuthorizeURL builds the Facebook login dialog URL.
 	AuthorizeURL(redirectURI, state string) string
 	// ExchangeCode trades an authorization code for a short-lived user token.
@@ -72,6 +71,12 @@ type GraphClient interface {
 	// Accounts lists the pages the user administers, with their page tokens
 	// and linked Instagram accounts, following pagination to the end.
 	Accounts(ctx context.Context, userToken string) ([]Page, error)
+}
+
+// GraphClient is everything the application needs from the Meta Graph API.
+// Implementations translate transport failures into *GraphError.
+type GraphClient interface {
+	MetaOAuthClient
 
 	// --- Facebook Page, read ---
 

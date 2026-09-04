@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "id": "page-3",
+      "name": "Garage des Hauts",
+      "access_token": "PAGE-TOKEN-3",
+      "instagram_business_account": {"id": "ig-3", "username": "garagedeshauts"}
+    },
+    {
+      "id": "page-sans-jeton",
+      "name": "Page sans rôle"
+    }
+  ],
+  "paging": {"cursors": {"after": "NDQZD"}}
+}

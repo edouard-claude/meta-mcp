@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>Connecter votre compte Facebook</h1>
+<p>
+  Cette application va lire les statistiques de vos Pages Facebook et de vos
+  comptes Instagram professionnels, et publier en votre nom lorsque vous le
+  demanderez explicitement.
+</p>
+<p>Vous serez redirigé vers Facebook pour autoriser l'accès.</p>
+<a class="btn" href="{{.AuthorizeURL}}" rel="noopener">Continuer avec Facebook</a>
+<p class="muted">
+  Aucune donnée n'est partagée avec des tiers. Consultez la
+  <a href="{{.PrivacyURL}}">politique de confidentialité</a>.
+</p>
+{{end}}

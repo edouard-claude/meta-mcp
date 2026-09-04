@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "id": "page-1",
+      "name": "Boulangerie du Port",
+      "access_token": "PAGE-TOKEN-1",
+      "instagram_business_account": {"id": "ig-1", "username": "boulangerieduport"}
+    },
+    {
+      "id": "page-2",
+      "name": "Snack Créole",
+      "access_token": "PAGE-TOKEN-2"
+    }
+  ],
+  "paging": {"cursors": {"after": "MjQZD"}, "next": "__NEXT__"}
+}
