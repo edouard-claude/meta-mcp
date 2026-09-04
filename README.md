@@ -248,18 +248,32 @@ claude mcp add --scope user --transport http meta https://<domain>/mcp
 </details>
 
 <details>
-<summary><b>Claude Desktop, or any MCP client</b></summary>
+<summary><b>Claude Desktop</b></summary>
+
+*Settings, Connectors, Add custom connector*, paste `https://<domain>/mcp`. Custom
+connectors need a paid plan.
+
+Without them, bridge the remote server through stdio: `claude_desktop_config.json`
+only knows how to spawn a local executable, it does not speak HTTP.
 
 ```json
 {
   "mcpServers": {
     "meta": {
-      "type": "http",
-      "url": "https://<domain>/mcp"
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://<domain>/mcp"]
     }
   }
 }
 ```
+</details>
+
+<details>
+<summary><b>Any other MCP client</b></summary>
+
+Point it at `https://<domain>/mcp` over Streamable HTTP. The server advertises its
+authorization server in the `WWW-Authenticate` header of the 401, so a client that
+implements the MCP authorization spec needs nothing else.
 </details>
 
 A page opens: **Continue with Facebook**, pick the Pages to share, accept the
