@@ -93,8 +93,15 @@ the JWTs have not expired.
 
 Everything happens on [developers.facebook.com](https://developers.facebook.com/apps).
 
-**1. Create the app.** *Create an app*, use case *Other*, type **Business**. Copy the
-app id and secret from *Settings, Basic*: those are `META_APP_ID` and `META_APP_SECRET`.
+**1. Create the app.** *Create an app*, then under *Content management* tick both
+**Manage everything on your Page** and **Manage messages and content on Instagram**.
+Those two use cases pre-wire the permission set below; the generic *Other* path leaves
+you adding every permission by hand. Skip the business portfolio unless you plan to
+publish the app. Copy the app id and secret from *Settings, Basic*: those are
+`META_APP_ID` and `META_APP_SECRET`.
+
+Note that Meta rejects any app name containing `meta`, `fb`, `face`, `book`, `insta`
+or `gram`: pick something else, the name is only what users see on the login dialog.
 
 **2. Fill in the URLs**, with `PUBLIC_URL` the public address of your server:
 
@@ -114,7 +121,9 @@ server-side.
 **4. Tell your users** their Instagram account must be **Business or Creator** and
 **linked to a Page** they administer. A personal account exposes no insights.
 
-The login dialog asks for:
+**5. Check the permissions.** In *Use cases*, customize each one and make sure every
+scope below reads **Ready for testing**. The two use cases do not grant all of them on
+their own, so a few need adding by hand:
 
 ```
 pages_show_list, pages_read_engagement, pages_manage_posts,
@@ -123,7 +132,13 @@ instagram_basic, instagram_manage_insights, instagram_content_publish,
 instagram_manage_comments, business_management
 ```
 
-Set `META_SCOPES` to narrow that down, for instance to drop the write permissions.
+One trap: the Instagram use case opens on *API setup with Instagram login*, whose
+`instagram_business_*` scopes belong to a different token model. This server uses
+Facebook Login, so it needs the `instagram_basic` family listed above. Adding them
+from the *Permissions and features* tab is enough; you can ignore the Instagram login
+setup screen entirely.
+
+Set `META_SCOPES` to narrow the list down, for instance to drop the write permissions.
 
 ## Configure
 
