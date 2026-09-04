@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/edouard/metasocial-mcp/internal/adapters/authserver"
+	"github.com/edouard/metasocial-mcp/internal/adapters/clock"
 	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
 	"github.com/edouard/metasocial-mcp/internal/adapters/httpserver"
 	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
@@ -64,8 +66,22 @@ func run() error {
 	}
 	go purgeLoop(ctx, store, logger)
 
+	auth := authserver.New(store, clock.System{}, authserver.Options{
+		Issuer:          cfg.PublicURL,
+		Resource:        cfg.MCPResourceURL(),
+		SigningKey:      cfg.JWTSigningKey,
+		LoginPath:       "/meta/login",
+		AccessTokenTTL:  cfg.AccessTokenTTL,
+		RefreshTokenTTL: cfg.RefreshTokenTTL,
+	}, logger)
+
 	handler := httpserver.New(httpserver.Handlers{
-		Health: store.Ping,
+		ProtectedResourceMetadata: auth.ProtectedResourceMetadataHandler(),
+		AuthServerMetadata:        auth.AuthServerMetadataHandler(),
+		Register:                  auth.RegisterHandler(),
+		Authorize:                 auth.AuthorizeHandler(),
+		Token:                     auth.TokenHandler(),
+		Health:                    store.Ping,
 	}, logger)
 
 	srv := &http.Server{
