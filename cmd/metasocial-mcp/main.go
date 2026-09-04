@@ -82,6 +82,8 @@ func run() error {
 		AppID:       cfg.MetaAppID,
 		AppSecret:   cfg.MetaAppSecret,
 		Version:     cfg.GraphVersion,
+		GraphBase:   cfg.GraphBaseURL,
+		DialogBase:  cfg.DialogBaseURL,
 		RedirectURI: cfg.MetaRedirectURI(),
 		Scopes:      cfg.MetaScopes,
 	})

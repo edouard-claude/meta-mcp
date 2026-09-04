@@ -41,6 +41,7 @@ func New(svc *app.Service, logger *slog.Logger) *mcp.Server {
 	})
 
 	d.registerReadTools(srv)
+	d.registerWriteTools(srv)
 	return srv
 }
 
@@ -104,6 +105,16 @@ func (d *deps) toolError(tool string, err error) error {
 	}
 	d.logger.Error("erreur d'outil", "tool", tool, "error", err)
 	return err
+}
+
+// writing annotates a tool that can create content at Meta.
+func writing() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{
+		ReadOnlyHint:    false,
+		DestructiveHint: ptr(false),
+		IdempotentHint:  false,
+		OpenWorldHint:   ptr(true),
+	}
 }
 
 // readOnly annotates a tool that never writes anything at Meta.

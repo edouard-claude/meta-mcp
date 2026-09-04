@@ -2,6 +2,13 @@ module github.com/edouard/metasocial-mcp
 
 go 1.26.0
 
+// Only two direct dependencies, both required by the SPEC:
+//   - go-sdk implements the MCP protocol and its Streamable HTTP transport;
+//     writing that by hand would mean re-implementing a moving specification.
+//   - modernc.org/sqlite is a pure Go SQLite driver, which keeps the binary
+//     static (CGO_ENABLED=0) while still giving us a real database.
+// Everything else below is pulled in transitively by these two. Any new
+// direct dependency must be justified here before being added.
 require (
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	modernc.org/sqlite v1.58.0

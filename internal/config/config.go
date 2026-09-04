@@ -27,6 +27,12 @@ const (
 	EnvRefreshTokenTTL    = "REFRESH_TOKEN_TTL"
 	EnvLogFormat          = "LOG_FORMAT"
 	EnvAllowedMetaUserIDs = "ALLOWED_META_USER_IDS"
+
+	// EnvGraphBaseURL and EnvDialogBaseURL point the Graph client somewhere
+	// else than Meta. They exist for the end to end test, which runs the
+	// real binary against a fake Graph, and are not meant for production.
+	EnvGraphBaseURL  = "META_GRAPH_BASE_URL"
+	EnvDialogBaseURL = "META_DIALOG_BASE_URL"
 )
 
 const (
@@ -65,6 +71,12 @@ type Config struct {
 	RefreshTokenTTL time.Duration
 	LogFormat       string
 
+	// GraphBaseURL and DialogBaseURL override the Meta endpoints. Empty in
+	// production, where the client uses graph.facebook.com and
+	// www.facebook.com.
+	GraphBaseURL  string
+	DialogBaseURL string
+
 	// AllowedMetaUserIDs, when non-empty, is the whitelist of Facebook user
 	// ids allowed to create a tenant.
 	AllowedMetaUserIDs map[string]struct{}
@@ -101,6 +113,8 @@ func Load() (*Config, error) {
 		GraphVersion:       env(EnvMetaGraphVersion, defaultGraphVersion),
 		MetaScopes:         env(EnvMetaScopes, DefaultMetaScopes),
 		LogFormat:          env(EnvLogFormat, defaultLogFormat),
+		GraphBaseURL:       strings.TrimRight(os.Getenv(EnvGraphBaseURL), "/"),
+		DialogBaseURL:      strings.TrimRight(os.Getenv(EnvDialogBaseURL), "/"),
 		AllowedMetaUserIDs: parseCSVSet(os.Getenv(EnvAllowedMetaUserIDs)),
 	}
 
