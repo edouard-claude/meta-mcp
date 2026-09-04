@@ -96,9 +96,18 @@ func (h *Handlers) CallbackHandler() http.Handler {
 			return
 		}
 
-		// The user declined the Facebook dialog: tell the MCP client.
+		// A reconnection link carries no MCP client: the flow ends on a
+		// confirmation page instead of a redirect.
+		isReconnect := login.Request.ClientID == ""
+
+		// The user declined the Facebook dialog.
 		if fbErr := q.Get("error"); fbErr != "" {
 			h.logger.Info("autorisation Facebook refusée", "reason", q.Get("error_reason"))
+			if isReconnect {
+				h.renderError(w, http.StatusOK, "Autorisation refusée",
+					"Vous avez refusé l'accès à Facebook, rien n'a été modifié.", "")
+				return
+			}
 			h.redirectToClient(w, r, login.Request, map[string]string{
 				"error":             "access_denied",
 				"error_description": "autorisation Facebook refusée",
@@ -127,6 +136,15 @@ func (h *Handlers) CallbackHandler() http.Handler {
 			return
 		}
 		h.logger.Info("tenant connecté", "tenant_id", result.TenantID, "pages", result.Pages)
+
+		if isReconnect {
+			h.render(w, http.StatusOK, web.PageReconnected, web.ReconnectedData{
+				Title:       "Compte reconnecté",
+				DisplayName: result.DisplayName,
+				Pages:       result.Pages,
+			})
+			return
+		}
 
 		target, err := h.issuer.IssueAuthCode(r, login.Request, result.TenantID)
 		if err != nil {

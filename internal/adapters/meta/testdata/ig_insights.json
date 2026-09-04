@@ -1,0 +1,6 @@
+{
+  "data": [
+    {"name": "reach", "period": "day", "title": "Reach", "total_value": {"value": 4210}},
+    {"name": "follower_count", "period": "day", "title": "Followers", "total_value": {"value": 38}}
+  ]
+}

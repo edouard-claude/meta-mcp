@@ -1,0 +1,10 @@
+{{define "content"}}
+<h1>Compte reconnecté</h1>
+<p>
+  Votre autorisation Facebook a été renouvelée pour <strong>{{.DisplayName}}</strong>.
+  {{if .Pages}}{{.Pages}} page(s) synchronisée(s).{{end}}
+</p>
+<p class="muted">
+  Vous pouvez fermer cet onglet et reprendre votre conversation.
+</p>
+{{end}}

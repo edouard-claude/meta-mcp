@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "name": "follower_demographics",
+      "period": "lifetime",
+      "title": "Follower demographics",
+      "total_value": {
+        "breakdowns": [
+          {
+            "dimension_keys": ["city"],
+            "results": [
+              {"dimension_values": ["Saint-Denis, Réunion"], "value": 812},
+              {"dimension_values": ["Saint-Pierre, Réunion"], "value": 344}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -19,6 +19,7 @@ const (
 	PageError       = "error.html"
 	PageDeauthorize = "deauthorize.html"
 	PagePrivacy     = "privacy.html"
+	PageReconnected = "reconnected.html"
 )
 
 // LoginData fills the "connect your Facebook account" page.
@@ -41,6 +42,13 @@ type DeauthorizeData struct {
 	ConfirmationCode string
 }
 
+// ReconnectedData fills the page shown after a successful reconnection.
+type ReconnectedData struct {
+	Title       string
+	DisplayName string
+	Pages       int
+}
+
 // PrivacyData fills the privacy policy page.
 type PrivacyData struct {
 	Title string
@@ -51,7 +59,7 @@ type PrivacyData struct {
 // all into one template set.
 var pages = func() map[string]*template.Template {
 	out := map[string]*template.Template{}
-	for _, name := range []string{PageLogin, PageError, PageDeauthorize, PagePrivacy} {
+	for _, name := range []string{PageLogin, PageError, PageDeauthorize, PagePrivacy, PageReconnected} {
 		out[name] = template.Must(template.ParseFS(files, "layout.html", name))
 	}
 	return out

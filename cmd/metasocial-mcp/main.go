@@ -21,6 +21,7 @@ import (
 	"github.com/edouard/metasocial-mcp/internal/adapters/clock"
 	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
 	"github.com/edouard/metasocial-mcp/internal/adapters/httpserver"
+	"github.com/edouard/metasocial-mcp/internal/adapters/mcpserver"
 	"github.com/edouard/metasocial-mcp/internal/adapters/meta"
 	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
 	"github.com/edouard/metasocial-mcp/internal/app"
@@ -93,6 +94,20 @@ func run() error {
 		AppSecret:   cfg.MetaAppSecret,
 	}, logger)
 
+	svc := app.NewService(store, graph, clock.System{}, cfg.PublicURL)
+	mcpHandler := mcpserver.Handler(
+		mcpserver.New(svc, logger),
+		func(token string) (string, time.Time, error) {
+			claims, err := auth.VerifyAccessToken(token)
+			if err != nil {
+				return "", time.Time{}, err
+			}
+			return claims.TenantID(), claims.Expiry(), nil
+		},
+		mcpserver.HandlerOptions{ResourceMetadataURL: cfg.ResourceMetadataURL()},
+		logger,
+	)
+
 	handler := httpserver.New(httpserver.Handlers{
 		ProtectedResourceMetadata: auth.ProtectedResourceMetadataHandler(),
 		AuthServerMetadata:        auth.AuthServerMetadataHandler(),
@@ -104,6 +119,7 @@ func run() error {
 		MetaDataDeletion:          metaHandlers.DataDeletionHandler(),
 		MetaDeauthorize:           metaHandlers.DeauthorizeHandler(),
 		Privacy:                   metaHandlers.PrivacyHandler(),
+		MCP:                       mcpHandler,
 		Health:                    store.Ping,
 	}, logger)
 

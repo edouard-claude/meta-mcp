@@ -1,0 +1,216 @@
+package meta
+
+import (
+	"encoding/json"
+	"testing"
+	"time"
+)
+
+var (
+	testSince = time.Date(2026, 8, 8, 0, 0, 0, 0, time.UTC)
+	testUntil = time.Date(2026, 9, 4, 0, 0, 0, 0, time.UTC)
+)
+
+func TestPageInsights(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1/insights", "page_insights.json", "")
+
+	insights, err := g.newTestClient().PageInsights(t.Context(), "PT", "page-1",
+		[]string{"page_impressions_unique", "page_follows"}, testSince, testUntil)
+	if err != nil {
+		t.Fatalf("PageInsights: %v", err)
+	}
+	if len(insights) != 2 {
+		t.Fatalf("%d métriques", len(insights))
+	}
+	if insights[0].Metric != "page_impressions_unique" || insights[0].Period != "day" {
+		t.Fatalf("métrique = %+v", insights[0])
+	}
+	if len(insights[0].Values) != 2 {
+		t.Fatalf("%d valeurs", len(insights[0].Values))
+	}
+	var value int64
+	if err := json.Unmarshal(insights[0].Values[0].Value, &value); err != nil || value != 1234 {
+		t.Fatalf("valeur = %s (err %v)", insights[0].Values[0].Value, err)
+	}
+	if insights[0].Values[0].EndTime != "2026-08-30T07:00:00+0000" {
+		t.Fatalf("end_time = %q", insights[0].Values[0].EndTime)
+	}
+
+	q := g.calls("/page-1/insights")[0].Query
+	if q.Get("metric") != "page_impressions_unique,page_follows" {
+		t.Fatalf("metric = %q", q.Get("metric"))
+	}
+	if q.Get("since") == "" || q.Get("until") == "" {
+		t.Fatalf("fenêtre absente: %v", q)
+	}
+}
+
+func TestPageInsightsMetadata(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1/insights/metadata", "page_insights_metadata.json", "")
+
+	metrics, err := g.newTestClient().PageInsightsMetadata(t.Context(), "PT", "page-1")
+	if err != nil {
+		t.Fatalf("PageInsightsMetadata: %v", err)
+	}
+	if len(metrics) != 2 || metrics[0].Name != "page_impressions_unique" {
+		t.Fatalf("métriques = %+v", metrics)
+	}
+	if metrics[1].Description == "" {
+		t.Fatalf("description absente: %+v", metrics[1])
+	}
+}
+
+func TestPagePostsFlattensInsights(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1/posts", "page_posts.json", "")
+
+	posts, err := g.newTestClient().PagePosts(t.Context(), "PT", "page-1", testSince, 25)
+	if err != nil {
+		t.Fatalf("PagePosts: %v", err)
+	}
+	if len(posts) != 2 {
+		t.Fatalf("%d publications", len(posts))
+	}
+	first := posts[0]
+	if first.PostID != "page-1_111" || first.Message != "Nouvelle fournée" {
+		t.Fatalf("publication = %+v", first)
+	}
+	if first.ImpressionsUnique != 540 || first.Clicks != 23 {
+		t.Fatalf("statistiques = %+v", first)
+	}
+	// Reactions come back as an object keyed by type and must be summed.
+	if first.Reactions != 37 {
+		t.Fatalf("réactions = %d, attendu 37", first.Reactions)
+	}
+	if posts[1].Reactions != 0 || posts[1].ImpressionsUnique != 0 {
+		t.Fatalf("publication sans insights = %+v", posts[1])
+	}
+
+	q := g.calls("/page-1/posts")[0].Query
+	if q.Get("limit") != "25" || q.Get("since") == "" {
+		t.Fatalf("paramètres = %v", q)
+	}
+}
+
+func TestPostComments(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /111/comments", "page_comments.json", "")
+
+	comments, err := g.newTestClient().PostComments(t.Context(), "PT", "111", 50)
+	if err != nil {
+		t.Fatalf("PostComments: %v", err)
+	}
+	if len(comments) != 2 || comments[0].From != "Alice" || comments[0].Message != "Miam" {
+		t.Fatalf("commentaires = %+v", comments)
+	}
+	if comments[0].CreatedTime != "2026-08-30T10:00:00+0000" {
+		t.Fatalf("date = %q", comments[0].CreatedTime)
+	}
+}
+
+func TestIGAccountInsightsNormalizesTotalValue(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /ig-1/insights", "ig_insights.json", "")
+
+	insights, err := g.newTestClient().IGAccountInsights(t.Context(), "PT", "ig-1",
+		[]string{"reach", "follower_count"}, testSince, testUntil)
+	if err != nil {
+		t.Fatalf("IGAccountInsights: %v", err)
+	}
+	if len(insights) != 2 {
+		t.Fatalf("%d métriques", len(insights))
+	}
+	// Instagram returns total_value, which must land in Values like Facebook.
+	if len(insights[0].Values) != 1 {
+		t.Fatalf("valeurs = %+v", insights[0])
+	}
+	var value int64
+	if err := json.Unmarshal(insights[0].Values[0].Value, &value); err != nil || value != 4210 {
+		t.Fatalf("valeur = %s (err %v)", insights[0].Values[0].Value, err)
+	}
+
+	q := g.calls("/ig-1/insights")[0].Query
+	if q.Get("metric_type") != "total_value" || q.Get("period") != "day" {
+		t.Fatalf("paramètres = %v", q)
+	}
+}
+
+func TestIGFollowerDemographics(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /ig-1/insights", "ig_demographics.json", "")
+
+	breakdowns, err := g.newTestClient().IGFollowerDemographics(t.Context(), "PT", "ig-1", "city")
+	if err != nil {
+		t.Fatalf("IGFollowerDemographics: %v", err)
+	}
+	if len(breakdowns) != 2 {
+		t.Fatalf("%d entrées", len(breakdowns))
+	}
+	if breakdowns[0].Key != "Saint-Denis, Réunion" || breakdowns[0].Value != 812 {
+		t.Fatalf("entrée = %+v", breakdowns[0])
+	}
+
+	q := g.calls("/ig-1/insights")[0].Query
+	if q.Get("metric") != "follower_demographics" || q.Get("breakdown") != "city" ||
+		q.Get("period") != "lifetime" {
+		t.Fatalf("paramètres = %v", q)
+	}
+}
+
+func TestIGMediaFlattensInsights(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /ig-1/media", "ig_media.json", "")
+
+	media, err := g.newTestClient().IGMedia(t.Context(), "PT", "ig-1", testSince, 25)
+	if err != nil {
+		t.Fatalf("IGMedia: %v", err)
+	}
+	if len(media) != 1 {
+		t.Fatalf("%d médias", len(media))
+	}
+	m := media[0]
+	if m.MediaID != "media-1" || m.Type != "IMAGE" || m.ProductType != "FEED" {
+		t.Fatalf("média = %+v", m)
+	}
+	if m.LikeCount != 210 || m.CommentsCount != 14 {
+		t.Fatalf("compteurs = %+v", m)
+	}
+	if m.Reach != 3100 || m.Views != 4200 || m.Saved != 45 || m.Shares != 12 || m.TotalInteractions != 281 {
+		t.Fatalf("statistiques = %+v", m)
+	}
+}
+
+func TestIGMediaComments(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /media-1/comments", "ig_comments.json", "")
+
+	comments, err := g.newTestClient().IGMediaComments(t.Context(), "PT", "media-1", 50)
+	if err != nil {
+		t.Fatalf("IGMediaComments: %v", err)
+	}
+	if len(comments) != 1 {
+		t.Fatalf("%d commentaires", len(comments))
+	}
+	// Instagram uses username/text/timestamp where Facebook uses from/message.
+	if comments[0].Username != "bob974" || comments[0].Message != "Magnifique" {
+		t.Fatalf("commentaire = %+v", comments[0])
+	}
+	if comments[0].CreatedTime != "2026-08-29T18:00:00+0000" {
+		t.Fatalf("date = %q", comments[0].CreatedTime)
+	}
+}
+
+func TestLimitCapsTheNumberOfItems(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1/posts", "page_posts.json", "")
+
+	posts, err := g.newTestClient().PagePosts(t.Context(), "PT", "page-1", testSince, 1)
+	if err != nil {
+		t.Fatalf("PagePosts: %v", err)
+	}
+	if len(posts) != 1 {
+		t.Fatalf("%d publications, attendu 1", len(posts))
+	}
+}

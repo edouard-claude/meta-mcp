@@ -88,7 +88,7 @@ func (s *LoginService) Complete(ctx context.Context, code, redirectURI string) (
 		return nil, fmt.Errorf("enregistrement du tenant: %w", err)
 	}
 
-	pages, err := s.syncPages(ctx, tenant.ID, userToken)
+	pages, err := syncPages(ctx, s.store, s.meta, tenant.ID, userToken)
 	if err != nil {
 		return nil, err
 	}
@@ -101,18 +101,7 @@ func (s *LoginService) SyncPages(ctx context.Context, tenantID string) ([]domain
 	if err != nil {
 		return nil, err
 	}
-	return s.syncPages(ctx, tenant.ID, tenant.UserToken)
-}
-
-func (s *LoginService) syncPages(ctx context.Context, tenantID, userToken string) ([]domain.Page, error) {
-	pages, err := s.meta.Accounts(ctx, userToken)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.store.ReplacePages(ctx, tenantID, pages); err != nil {
-		return nil, fmt.Errorf("enregistrement des pages: %w", err)
-	}
-	return pages, nil
+	return syncPages(ctx, s.store, s.meta, tenant.ID, tenant.UserToken)
 }
 
 // DeleteByMetaUserID removes a tenant and everything attached to it. It backs

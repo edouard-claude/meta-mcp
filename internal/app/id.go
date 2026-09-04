@@ -5,6 +5,7 @@ package app
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 )
 
@@ -28,4 +29,14 @@ func newTenantID() string {
 	out[23] = '-'
 	hex.Encode(out[24:36], b[10:16])
 	return string(out[:])
+}
+
+// newSecret returns 32 bytes of randomness, base64url encoded. It backs the
+// reconnection state, which must be unguessable.
+func newSecret() (string, error) {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b[:]), nil
 }

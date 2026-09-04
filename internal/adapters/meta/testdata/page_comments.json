@@ -1,0 +1,6 @@
+{
+  "data": [
+    {"id": "111_1", "from": {"name": "Alice"}, "message": "Miam", "created_time": "2026-08-30T10:00:00+0000"},
+    {"id": "111_2", "from": {"name": "Bob"}, "message": "À quelle heure ?", "created_time": "2026-08-30T11:00:00+0000"}
+  ]
+}

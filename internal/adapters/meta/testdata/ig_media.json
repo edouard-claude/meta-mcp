@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": "media-1",
+      "caption": "Coucher de soleil",
+      "media_type": "IMAGE",
+      "media_product_type": "FEED",
+      "timestamp": "2026-08-29T17:45:00+0000",
+      "permalink": "https://www.instagram.com/p/abc/",
+      "like_count": 210,
+      "comments_count": 14,
+      "insights": {
+        "data": [
+          {"name": "reach", "values": [{"value": 3100}]},
+          {"name": "views", "values": [{"value": 4200}]},
+          {"name": "saved", "values": [{"value": 45}]},
+          {"name": "shares", "values": [{"value": 12}]},
+          {"name": "total_interactions", "values": [{"value": 281}]}
+        ]
+      }
+    }
+  ]
+}

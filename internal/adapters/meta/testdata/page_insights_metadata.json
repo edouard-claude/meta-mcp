@@ -1,0 +1,6 @@
+{
+  "data": [
+    {"name": "page_impressions_unique", "period": "day", "description": "Nombre de personnes atteintes"},
+    {"name": "page_views_total", "period": "day", "description": "Vues de la page"}
+  ]
+}

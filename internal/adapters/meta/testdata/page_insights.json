@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "name": "page_impressions_unique",
+      "period": "day",
+      "title": "Daily Total Reach",
+      "values": [
+        {"value": 1234, "end_time": "2026-08-30T07:00:00+0000"},
+        {"value": 987, "end_time": "2026-08-31T07:00:00+0000"}
+      ]
+    },
+    {
+      "name": "page_follows",
+      "period": "day",
+      "title": "Daily Follows",
+      "values": [{"value": 12, "end_time": "2026-08-30T07:00:00+0000"}]
+    }
+  ]
+}
