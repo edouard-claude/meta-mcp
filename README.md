@@ -178,6 +178,12 @@ The repository ships the `Dockerfile` (multi-stage, `golang:1.26-alpine` to
 2. *App Configs*: persistent directory `/data`, the environment variables above,
    container HTTP port `8080`. Without the volume the database is wiped on every
    deploy and everyone has to reconnect.
+
+   The image runs unprivileged (uid 65532) and ships `/data` owned by that uid, so a
+   volume created from it is writable. A volume that already exists from an earlier
+   deploy stays `root`-owned and the process dies on `unable to open database file`:
+   delete it and let CapRover recreate it, or fix it once with
+   `sudo docker run --rm -v <volume>:/data busybox chown -R 65532:65532 /data`.
 3. *HTTP Settings*: enable HTTPS and **Force HTTPS**. The binary only speaks plain
    HTTP internally; CapRover terminates TLS.
 4. *Deployment*: **Enable App Token**, keep the token.

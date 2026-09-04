@@ -7,15 +7,17 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/metasocial-mcp ./cmd/metasocial-mcp
 
+# The data directory is created here, owned by the unprivileged uid the final
+# image runs as. Docker copies that ownership when it initialises a fresh named
+# volume on the same path, which is what lets the process write its SQLite file
+# without running as root.
+RUN mkdir -p /data && chown 65532:65532 /data
+
 # --- run ---
-#
-# The image runs as root on purpose. The SQLite file lives on a persistent
-# volume that the orchestrator creates root-owned, so an unprivileged user
-# cannot open it: the process would die on "unable to open database file".
-# There is no shell and no package manager in the image, and the only thing
-# it runs is this one static binary.
-FROM gcr.io/distroless/static-debian12
+FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/metasocial-mcp /metasocial-mcp
+COPY --from=build --chown=65532:65532 /data /data
 VOLUME ["/data"]
 EXPOSE 8080
+USER 65532:65532
 ENTRYPOINT ["/metasocial-mcp"]
