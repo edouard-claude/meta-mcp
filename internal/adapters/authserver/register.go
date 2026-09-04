@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // maxRedirectURIs bounds what a single client may register.

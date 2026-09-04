@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // Instagram container polling: Meta processes a media asynchronously, so the

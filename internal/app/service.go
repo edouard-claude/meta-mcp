@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // defaultWindowDays is the reporting window used when the caller gives no

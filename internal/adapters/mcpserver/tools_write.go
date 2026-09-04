@@ -3,7 +3,7 @@ package mcpserver
 import (
 	"context"
 
-	"github.com/edouard/metasocial-mcp/internal/app"
+	"github.com/edouard-claude/meta-mcp/internal/app"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

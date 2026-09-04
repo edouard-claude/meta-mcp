@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/crypto"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 func newTestStore(t *testing.T) *Store {

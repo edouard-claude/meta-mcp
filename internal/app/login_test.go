@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // fakeMetaOAuth is a scriptable domain.MetaOAuthClient.

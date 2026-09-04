@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // Carousel bounds imposed by Instagram.

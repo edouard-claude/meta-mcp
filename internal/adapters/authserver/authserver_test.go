@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
-	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/crypto"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/sqlite"
 )
 
 const (

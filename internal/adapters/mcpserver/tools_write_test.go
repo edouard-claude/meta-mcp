@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edouard/metasocial-mcp/internal/app"
+	"github.com/edouard-claude/meta-mcp/internal/app"
 )
 
 // TestWriteToolsNeverWriteWithoutConfirm is the acceptance criterion of the

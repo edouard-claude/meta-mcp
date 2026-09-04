@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
-	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
-	"github.com/edouard/metasocial-mcp/internal/app"
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/crypto"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/sqlite"
+	"github.com/edouard-claude/meta-mcp/internal/app"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 const (

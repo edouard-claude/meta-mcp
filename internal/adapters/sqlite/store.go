@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // Store is the SQLite implementation of domain.TenantStore. It owns the

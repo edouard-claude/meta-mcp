@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // writeOK replies with an identifier, the way every Graph write endpoint does.

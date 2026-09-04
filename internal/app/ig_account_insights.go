@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // DefaultIGMetrics is the metric set ig_account_insights reads by default.

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // fakeGraph is a domain.GraphClient that records the token and object it was

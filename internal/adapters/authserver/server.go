@@ -17,7 +17,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // TTLs of the short-lived artefacts of the flow.

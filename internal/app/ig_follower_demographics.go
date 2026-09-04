@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // AllowedBreakdowns are the dimensions Meta accepts for

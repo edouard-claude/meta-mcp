@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // IGCommentsInput are the parameters of the ig_media_comments tool.

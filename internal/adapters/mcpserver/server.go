@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/edouard/metasocial-mcp/internal/app"
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/app"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

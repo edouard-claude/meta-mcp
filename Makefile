@@ -1,7 +1,7 @@
 BIN := bin/metasocial-mcp
 PKG := ./cmd/metasocial-mcp
 
-.PHONY: build run test check vet fmt lint tidy e2e clean
+.PHONY: build install run test check vet fmt lint tidy e2e clean
 
 build:
 	@mkdir -p bin
@@ -24,6 +24,9 @@ lint:
 
 # check is the gate every commit must pass.
 check: fmt vet lint test
+
+install:
+	CGO_ENABLED=0 go build -trimpath -o /usr/local/bin/metasocial-mcp $(PKG)
 
 # e2e starts the binary against a fake Graph API and drives it with the
 # official MCP inspector in CLI mode.

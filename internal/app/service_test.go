@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // fakeGraph is a domain.GraphClient that records what it was called with.

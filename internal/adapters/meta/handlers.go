@@ -14,9 +14,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/edouard/metasocial-mcp/internal/app"
-	"github.com/edouard/metasocial-mcp/internal/domain"
-	"github.com/edouard/metasocial-mcp/web"
+	"github.com/edouard-claude/meta-mcp/internal/app"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/web"
 )
 
 // CodeIssuer mints the MCP authorization code once Facebook has told us who

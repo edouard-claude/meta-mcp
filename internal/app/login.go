@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // LoginService turns a successful Facebook login into a tenant with its pages

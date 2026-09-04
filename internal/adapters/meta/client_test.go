@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 func TestAuthorizeURL(t *testing.T) {

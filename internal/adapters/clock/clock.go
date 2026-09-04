@@ -4,7 +4,7 @@ package clock
 import (
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // System reads the machine clock. Tests substitute their own domain.Clock.

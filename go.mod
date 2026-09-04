@@ -1,4 +1,4 @@
-module github.com/edouard/metasocial-mcp
+module github.com/edouard-claude/meta-mcp
 
 go 1.26.0
 

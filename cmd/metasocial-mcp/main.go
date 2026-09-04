@@ -17,15 +17,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/edouard/metasocial-mcp/internal/adapters/authserver"
-	"github.com/edouard/metasocial-mcp/internal/adapters/clock"
-	"github.com/edouard/metasocial-mcp/internal/adapters/crypto"
-	"github.com/edouard/metasocial-mcp/internal/adapters/httpserver"
-	"github.com/edouard/metasocial-mcp/internal/adapters/mcpserver"
-	"github.com/edouard/metasocial-mcp/internal/adapters/meta"
-	"github.com/edouard/metasocial-mcp/internal/adapters/sqlite"
-	"github.com/edouard/metasocial-mcp/internal/app"
-	"github.com/edouard/metasocial-mcp/internal/config"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/authserver"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/clock"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/crypto"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/httpserver"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/mcpserver"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/meta"
+	"github.com/edouard-claude/meta-mcp/internal/adapters/sqlite"
+	"github.com/edouard-claude/meta-mcp/internal/app"
+	"github.com/edouard-claude/meta-mcp/internal/config"
 )
 
 const (

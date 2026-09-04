@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/edouard/metasocial-mcp/migrations"
+	"github.com/edouard-claude/meta-mcp/migrations"
 
 	_ "modernc.org/sqlite" // database/sql driver "sqlite"
 )

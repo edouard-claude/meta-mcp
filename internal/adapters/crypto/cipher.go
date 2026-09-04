@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/edouard/metasocial-mcp/internal/domain"
+	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
 
 // ErrKeySize is returned when the configured key is not an AES-256 key.
