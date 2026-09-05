@@ -141,15 +141,17 @@ func (s *Store) scanTenant(sc scanner) (*domain.Tenant, error) {
 	return &t, nil
 }
 
-// TenantsDueForTokenRefresh lists the tenants whose Meta user token dies
-// before deadline. A stored 0 means the deadline is unknown, which happens for
-// rows created before the expiry column existed; those are refreshed too, so
-// they gain a real deadline on the first sweep.
-func (s *Store) TenantsDueForTokenRefresh(ctx context.Context, deadline time.Time) ([]domain.Tenant, error) {
+// TenantsDueForTokenRefresh lists the tenants to renew.
+//
+// A stored 0 means Meta never gave a deadline, either because the row predates
+// the expiry column or because the token does not expire. Those are retried on
+// updated_at rather than on every sweep.
+func (s *Store) TenantsDueForTokenRefresh(ctx context.Context, expiringBefore, uncheckedBefore time.Time) ([]domain.Tenant, error) {
 	const q = tenantColumns + ` FROM tenants
-		WHERE user_token_expires_at = 0 OR user_token_expires_at < ?
+		WHERE (user_token_expires_at > 0 AND user_token_expires_at < ?)
+		   OR (user_token_expires_at = 0 AND updated_at < ?)
 		ORDER BY user_token_expires_at`
-	rows, err := s.db.QueryContext(ctx, q, deadline.Unix())
+	rows, err := s.db.QueryContext(ctx, q, expiringBefore.Unix(), uncheckedBefore.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("select tenants to refresh: %w", err)
 	}

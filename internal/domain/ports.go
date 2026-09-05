@@ -26,9 +26,14 @@ type TenantStore interface {
 	TenantByID(ctx context.Context, id string) (*Tenant, error)
 	TenantByMetaUserID(ctx context.Context, metaUserID string) (*Tenant, error)
 	DeleteTenant(ctx context.Context, id string) error
-	// TenantsDueForTokenRefresh lists the tenants whose Meta user token dies
-	// before deadline, plus those whose deadline is unknown.
-	TenantsDueForTokenRefresh(ctx context.Context, deadline time.Time) ([]Tenant, error)
+	// TenantsDueForTokenRefresh lists the tenants to renew: those whose token
+	// dies before expiringBefore, and those whose deadline Meta never gave
+	// and that have not been checked since uncheckedBefore.
+	//
+	// The second bound matters because Meta issues non-expiring tokens for
+	// some Business flows: without it, a tenant with no known deadline would
+	// be re-exchanged on every single sweep, forever.
+	TenantsDueForTokenRefresh(ctx context.Context, expiringBefore, uncheckedBefore time.Time) ([]Tenant, error)
 
 	ReplacePages(ctx context.Context, tenantID string, pages []Page) error
 	ListPages(ctx context.Context, tenantID string) ([]Page, error)

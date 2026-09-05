@@ -418,19 +418,23 @@ func TestTenantsDueForTokenRefresh(t *testing.T) {
 	ctx := t.Context()
 	now := time.Now().UTC().Truncate(time.Second)
 
-	withExpiry := func(id, metaUserID string, expiry time.Time) {
+	withExpiry := func(id, metaUserID string, expiry, updatedAt time.Time) {
 		t.Helper()
 		tenant := seedTenant(t, s, id, metaUserID, "tok-"+id)
 		tenant.UserTokenExpiresAt = expiry
+		tenant.UpdatedAt = updatedAt
 		if err := s.UpsertTenant(ctx, tenant); err != nil {
 			t.Fatalf("UpsertTenant: %v", err)
 		}
 	}
-	withExpiry("inconnu", "meta-0", time.Time{})
-	withExpiry("bientot", "meta-1", now.Add(3*24*time.Hour))
-	withExpiry("lointain", "meta-2", now.Add(50*24*time.Hour))
+	// No known deadline and not looked at for a month.
+	withExpiry("inconnu", "meta-0", time.Time{}, now.Add(-30*24*time.Hour))
+	withExpiry("bientot", "meta-1", now.Add(3*24*time.Hour), now)
+	withExpiry("lointain", "meta-2", now.Add(50*24*time.Hour), now)
+	// No known deadline either, but checked an hour ago.
+	withExpiry("recent", "meta-3", time.Time{}, now.Add(-time.Hour))
 
-	due, err := s.TenantsDueForTokenRefresh(ctx, now.Add(14*24*time.Hour))
+	due, err := s.TenantsDueForTokenRefresh(ctx, now.Add(14*24*time.Hour), now.Add(-7*24*time.Hour))
 	if err != nil {
 		t.Fatalf("TenantsDueForTokenRefresh: %v", err)
 	}
@@ -443,5 +447,11 @@ func TestTenantsDueForTokenRefresh(t *testing.T) {
 	}
 	if len(due) != 2 || !ids["inconnu"] || !ids["bientot"] {
 		t.Fatalf("tenants à renouveler = %v", ids)
+	}
+
+	// The one checked an hour ago is left alone: otherwise a non-expiring
+	// token would be re-exchanged on every single sweep.
+	if ids["recent"] {
+		t.Fatal("un tenant sans échéance vérifié récemment est renouvelé à nouveau")
 	}
 }

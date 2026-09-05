@@ -98,7 +98,7 @@ func (s *fakeStore) TenantByMetaUserID(_ context.Context, metaUserID string) (*d
 	return nil, domain.ErrNotFound
 }
 
-func (s *fakeStore) TenantsDueForTokenRefresh(_ context.Context, deadline time.Time) ([]domain.Tenant, error) {
+func (s *fakeStore) TenantsDueForTokenRefresh(_ context.Context, expiringBefore, uncheckedBefore time.Time) ([]domain.Tenant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.failure("TenantsDueForTokenRefresh"); err != nil {
@@ -107,7 +107,9 @@ func (s *fakeStore) TenantsDueForTokenRefresh(_ context.Context, deadline time.T
 	var out []domain.Tenant
 	for _, id := range slices.Sorted(maps.Keys(s.tenants)) {
 		t := s.tenants[id]
-		if t.UserTokenExpiresAt.IsZero() || t.UserTokenExpiresAt.Before(deadline) {
+		known := !t.UserTokenExpiresAt.IsZero()
+		if (known && t.UserTokenExpiresAt.Before(expiringBefore)) ||
+			(!known && t.UpdatedAt.Before(uncheckedBefore)) {
 			out = append(out, *t)
 		}
 	}

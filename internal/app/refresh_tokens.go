@@ -14,6 +14,11 @@ import (
 // server that was down for a while without letting anyone drop off.
 const DefaultRefreshWindow = 14 * 24 * time.Hour
 
+// recheckInterval is how long a tenant whose deadline Meta never gave is left
+// alone between checks. Meta issues non-expiring tokens for some Business
+// flows, and re-exchanging those every sweep would be pure noise.
+const recheckInterval = 7 * 24 * time.Hour
+
 // RefreshReport summarizes one sweep.
 type RefreshReport struct {
 	Checked   int
@@ -36,7 +41,7 @@ func (s *LoginService) RefreshExpiringTokens(ctx context.Context, window time.Du
 	}
 	now := s.clock.Now()
 
-	tenants, err := s.store.TenantsDueForTokenRefresh(ctx, now.Add(window))
+	tenants, err := s.store.TenantsDueForTokenRefresh(ctx, now.Add(window), now.Add(-recheckInterval))
 	if err != nil {
 		return RefreshReport{}, fmt.Errorf("liste des jetons à renouveler: %w", err)
 	}

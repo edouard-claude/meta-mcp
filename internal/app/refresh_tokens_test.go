@@ -58,6 +58,8 @@ func TestRefreshRenewsTokensCloseToExpiry(t *testing.T) {
 func TestRefreshCoversTenantsWithUnknownExpiry(t *testing.T) {
 	svc, store, _, clk := newLoginHarness(t, nil)
 	seedTenantWithExpiry(t, store, "ancien", "meta-1", time.Time{})
+	// Never checked, so well past the recheck interval.
+	store.tenants["ancien"].UpdatedAt = clk.Now().Add(-30 * 24 * time.Hour)
 
 	report, err := svc.RefreshExpiringTokens(t.Context(), DefaultRefreshWindow)
 	if err != nil {
@@ -170,5 +172,31 @@ func TestTokenExpiresWithin(t *testing.T) {
 				t.Fatalf("TokenExpiresWithin = %v, attendu %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestRefreshLeavesFreshlyCheckedUnknownExpiryAlone covers what the live API
+// exposed: Meta issues non-expiring tokens, and treating an absent deadline as
+// "renew now" re-exchanged them on every single sweep.
+func TestRefreshLeavesFreshlyCheckedUnknownExpiryAlone(t *testing.T) {
+	svc, store, _, clk := newLoginHarness(t, nil)
+	seedTenantWithExpiry(t, store, "sans-echeance", "meta-1", time.Time{})
+	store.tenants["sans-echeance"].UpdatedAt = clk.Now().Add(-time.Hour)
+
+	report, err := svc.RefreshExpiringTokens(t.Context(), DefaultRefreshWindow)
+	if err != nil {
+		t.Fatalf("RefreshExpiringTokens: %v", err)
+	}
+	if report.Checked != 0 {
+		t.Fatalf("rapport = %+v, le jeton venait d'être vérifié", report)
+	}
+
+	// Once the recheck interval has passed, it is looked at again.
+	store.tenants["sans-echeance"].UpdatedAt = clk.Now().Add(-8 * 24 * time.Hour)
+	if report, err = svc.RefreshExpiringTokens(t.Context(), DefaultRefreshWindow); err != nil {
+		t.Fatalf("RefreshExpiringTokens: %v", err)
+	}
+	if report.Refreshed != 1 {
+		t.Fatalf("rapport = %+v", report)
 	}
 }
