@@ -33,7 +33,7 @@ func (d *deps) registerWriteTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "ig_publish",
 		Title:       "Publier sur Instagram",
-		Description: "Publie une image, un reel ou un carrousel sur le compte Instagram professionnel lié à une page. Les médias doivent être accessibles publiquement en https." + confirmDoc,
+		Description: "Publie une image, un reel, un carrousel ou une story sur le compte Instagram professionnel lié à une page. Les médias doivent être accessibles publiquement en https. Une story ne porte pas de légende." + confirmDoc,
 		Annotations: writing(),
 	}, d.toolIGPublish)
 
@@ -115,9 +115,9 @@ func (d *deps) toolPageReplyComment(ctx context.Context, req *mcp.CallToolReques
 // IGPublishArgs are the arguments of ig_publish.
 type IGPublishArgs struct {
 	PageID    string   `json:"page_id" jsonschema:"Page Facebook dont le compte Instagram professionnel est lié."`
-	MediaType string   `json:"media_type,omitempty" jsonschema:"IMAGE (défaut), REELS ou CAROUSEL."`
-	ImageURL  string   `json:"image_url,omitempty" jsonschema:"URL https de l'image, pour media_type=IMAGE."`
-	VideoURL  string   `json:"video_url,omitempty" jsonschema:"URL https de la vidéo, pour media_type=REELS."`
+	MediaType string   `json:"media_type,omitempty" jsonschema:"IMAGE (défaut), REELS, CAROUSEL ou STORIES."`
+	ImageURL  string   `json:"image_url,omitempty" jsonschema:"URL https de l'image, pour media_type=IMAGE ou STORIES."`
+	VideoURL  string   `json:"video_url,omitempty" jsonschema:"URL https de la vidéo, pour media_type=REELS ou STORIES."`
 	Children  []string `json:"children,omitempty" jsonschema:"URLs https des images du carrousel, de 2 à 10, pour media_type=CAROUSEL."`
 	Caption   string   `json:"caption,omitempty" jsonschema:"Légende de la publication."`
 	Confirm   bool     `json:"confirm,omitempty" jsonschema:"Doit valoir true pour publier réellement. false ou absent renvoie un aperçu sans rien écrire chez Meta."`
