@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -687,12 +688,26 @@ func TestPostListingsHaveNoImplicitLowerBound(t *testing.T) {
 func TestKnownMetricsExcludeDeprecatedAndInstagramWithoutAccount(t *testing.T) {
 	svc, _, _, _ := newServiceHarness(t)
 
+	// Every one of these was refused by the live Graph API, so proposing it
+	// would only send the caller into a rejected list.
+	deprecated := []string{
+		"page_impressions", "page_impressions_unique", "page_fans",
+		"post_impressions", "post_engaged_users", "post_activity",
+	}
 	for _, m := range KnownMetrics {
-		if m.Name == "page_impressions_unique" {
-			t.Fatal("le catalogue propose une métrique dépréciée")
+		if slices.Contains(deprecated, m.Name) {
+			t.Fatalf("le catalogue propose une métrique refusée par Meta: %s", m.Name)
 		}
 		if m.Surface != "page" && m.Surface != "instagram" {
 			t.Fatalf("surface inattendue: %+v", m)
+		}
+	}
+	for _, want := range []string{
+		"page_post_engagements", "page_daily_follows", "page_daily_unfollows",
+		"page_follows", "page_views_total", "page_video_views",
+	} {
+		if !slices.ContainsFunc(KnownMetrics, func(m domain.InsightMeta) bool { return m.Name == want }) {
+			t.Errorf("métrique attendue absente du catalogue: %s", want)
 		}
 	}
 

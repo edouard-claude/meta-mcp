@@ -14,6 +14,11 @@ import (
 // what a given object supports. Treat it as a starting point, not as truth.
 // page_insights is the real check, and reports whatever it could not read in
 // its "rejected" list.
+//
+// Every name here was tried against the live Graph API. page_fans and
+// page_impressions used to be listed and are gone: Meta rejects both, and a
+// catalogue that suggests metrics the server cannot read is worse than a
+// short one.
 var KnownMetrics = []domain.InsightMeta{
 	// --- Facebook Page, daily series ---
 	{Name: "page_post_engagements", Period: "day", Surface: "page",
@@ -26,10 +31,6 @@ var KnownMetrics = []domain.InsightMeta{
 		Description: "Nombre total d'abonnés."},
 	{Name: "page_views_total", Period: "day", Surface: "page",
 		Description: "Vues de la Page."},
-	{Name: "page_fans", Period: "day", Surface: "page",
-		Description: "Nombre total de mentions J'aime de la Page."},
-	{Name: "page_impressions", Period: "day", Surface: "page",
-		Description: "Impressions, toutes sources confondues."},
 	{Name: "page_video_views", Period: "day", Surface: "page",
 		Description: "Vues des vidéos de la Page."},
 
