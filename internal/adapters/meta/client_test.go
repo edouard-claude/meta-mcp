@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
@@ -56,8 +57,12 @@ func TestExchangeCodeAndLongLivedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExchangeLongLivedToken: %v", err)
 	}
-	if long != "LONG-TOKEN" {
-		t.Fatalf("jeton long = %q", long)
+	if long.Token != "LONG-TOKEN" {
+		t.Fatalf("jeton long = %q", long.Token)
+	}
+	// The lifetime is what lets the server renew before the token dies.
+	if long.ExpiresIn != 5183944*time.Second {
+		t.Fatalf("durée de vie = %v", long.ExpiresIn)
 	}
 
 	calls := g.calls("/oauth/access_token")
@@ -244,5 +249,55 @@ func TestNonJSONErrorIsWrapped(t *testing.T) {
 	}
 	if ge.HTTPStatus != http.StatusBadGateway || !strings.Contains(ge.Message, "502") {
 		t.Fatalf("erreur = %+v", ge)
+	}
+}
+
+func TestDebugToken(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /debug_token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"app_id":"app-id","type":"USER","is_valid":true,
+			"expires_at":1793318400,"data_access_expires_at":1801094400,
+			"scopes":["pages_show_list","instagram_basic"],"user_id":"9876543210"}}`))
+	})
+
+	status, err := g.newTestClient().DebugToken(t.Context(), "USER-TOKEN")
+	if err != nil {
+		t.Fatalf("DebugToken: %v", err)
+	}
+	if !status.Valid || len(status.Scopes) != 2 {
+		t.Fatalf("statut = %+v", status)
+	}
+	if status.ExpiresAt.Unix() != 1793318400 || status.DataAccessExpiresAt.Unix() != 1801094400 {
+		t.Fatalf("échéances = %v / %v", status.ExpiresAt, status.DataAccessExpiresAt)
+	}
+
+	// The call authenticates with the app token, not with the token under
+	// inspection, so the inspected one must travel as input_token only.
+	q := g.calls("/debug_token")[0].Query
+	if q.Get("input_token") != "USER-TOKEN" {
+		t.Fatalf("input_token = %q", q.Get("input_token"))
+	}
+	if q.Get("access_token") != "app-id|app-secret" {
+		t.Fatalf("access_token = %q", q.Get("access_token"))
+	}
+}
+
+func TestDebugTokenReportsInvalid(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /debug_token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"is_valid":false,"error":{"code":190,"message":"Session revoked"}}}`))
+	})
+
+	status, err := g.newTestClient().DebugToken(t.Context(), "REVOKED")
+	if err != nil {
+		t.Fatalf("DebugToken: %v", err)
+	}
+	if status.Valid || !strings.Contains(status.Reason, "revoked") {
+		t.Fatalf("statut = %+v", status)
+	}
+	if !status.ExpiresAt.IsZero() {
+		t.Fatalf("expiration = %v, attendue absente", status.ExpiresAt)
 	}
 }

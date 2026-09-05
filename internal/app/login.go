@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/edouard-claude/meta-mcp/internal/domain"
 )
@@ -51,11 +52,11 @@ func (s *LoginService) Complete(ctx context.Context, code, redirectURI string) (
 	if err != nil {
 		return nil, err
 	}
-	userToken, err := s.meta.ExchangeLongLivedToken(ctx, shortToken)
+	longLived, err := s.meta.ExchangeLongLivedToken(ctx, shortToken)
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.meta.Me(ctx, userToken)
+	user, err := s.meta.Me(ctx, longLived.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +66,13 @@ func (s *LoginService) Complete(ctx context.Context, code, redirectURI string) (
 
 	now := s.clock.Now()
 	tenant := &domain.Tenant{
-		ID:          newTenantID(),
-		MetaUserID:  user.ID,
-		DisplayName: user.Name,
-		UserToken:   userToken,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:                 newTenantID(),
+		MetaUserID:         user.ID,
+		DisplayName:        user.Name,
+		UserToken:          longLived.Token,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+		UserTokenExpiresAt: expiryFrom(now, longLived.ExpiresIn),
 	}
 	// A returning user keeps the tenant id they already had, so their MCP
 	// clients stay authorized against the same subject.
@@ -88,7 +90,7 @@ func (s *LoginService) Complete(ctx context.Context, code, redirectURI string) (
 		return nil, fmt.Errorf("enregistrement du tenant: %w", err)
 	}
 
-	pages, err := syncPages(ctx, s.store, s.meta, tenant.ID, userToken)
+	pages, err := syncPages(ctx, s.store, s.meta, tenant.ID, longLived.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -132,4 +134,14 @@ func (s *LoginService) ConsumeState(ctx context.Context, state string) (*domain.
 		return nil, domain.ErrNotFound
 	}
 	return login, nil
+}
+
+// expiryFrom turns Meta's relative lifetime into an absolute deadline. Meta
+// omits it for tokens it considers non-expiring, and the zero time is what
+// the refresh sweep reads as "renew at the next opportunity".
+func expiryFrom(now time.Time, lifetime time.Duration) time.Time {
+	if lifetime <= 0 {
+		return time.Time{}
+	}
+	return now.Add(lifetime)
 }

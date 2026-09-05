@@ -45,8 +45,20 @@ func (f *fakeGraph) ExchangeCode(context.Context, string, string) (string, error
 	return "SHORT", f.record("ExchangeCode", "", "")
 }
 
-func (f *fakeGraph) ExchangeLongLivedToken(context.Context, string) (string, error) {
-	return "LONG", f.record("ExchangeLongLivedToken", "", "")
+func (f *fakeGraph) ExchangeLongLivedToken(context.Context, string) (domain.LongLivedToken, error) {
+	return domain.LongLivedToken{Token: "LONG", ExpiresIn: 60 * 24 * time.Hour},
+		f.record("ExchangeLongLivedToken", "", "")
+}
+
+func (f *fakeGraph) DebugToken(_ context.Context, token string) (domain.TokenStatus, error) {
+	if err := f.record("DebugToken", token, ""); err != nil {
+		return domain.TokenStatus{}, err
+	}
+	return domain.TokenStatus{
+		Valid:     true,
+		ExpiresAt: time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC),
+		Scopes:    []string{"pages_show_list", "instagram_basic"},
+	}, nil
 }
 
 func (f *fakeGraph) Me(context.Context, string) (domain.MetaUser, error) {

@@ -34,6 +34,10 @@ const (
 	// purgeInterval is how often expired codes, states and refresh tokens are
 	// swept out of the database.
 	purgeInterval = 10 * time.Minute
+	// tokenRefreshInterval is how often Meta user tokens close to expiry are
+	// renewed. Twice a day is plenty for a two week renewal window, and keeps
+	// the load on the Graph API negligible.
+	tokenRefreshInterval = 12 * time.Hour
 )
 
 func main() {
@@ -89,6 +93,7 @@ func run() error {
 	})
 
 	login := app.NewLoginService(store, graph, clock.System{}, cfg.IsMetaUserAllowed)
+	go refreshLoop(ctx, login, logger)
 
 	metaHandlers := meta.NewHandlers(login, auth, meta.HandlerOptions{
 		PublicURL:   cfg.PublicURL,
@@ -167,6 +172,43 @@ func purgeLoop(ctx context.Context, store *sqlite.Store, logger *slog.Logger) {
 			if err := store.PurgeExpired(ctx, time.Now()); err != nil {
 				logger.Error("purge périodique", "error", err)
 			}
+		}
+	}
+}
+
+// refreshLoop renews the Meta user tokens that are about to expire, at
+// startup and then on a ticker. Without it every tenant silently loses access
+// about sixty days after connecting.
+func refreshLoop(ctx context.Context, login *app.LoginService, logger *slog.Logger) {
+	sweep := func() {
+		report, err := login.RefreshExpiringTokens(ctx, app.DefaultRefreshWindow)
+		if err != nil {
+			if ctx.Err() == nil {
+				logger.Error("renouvellement des jetons Meta", "error", err)
+			}
+			return
+		}
+		if report.Checked == 0 {
+			return
+		}
+		logger.Info("jetons Meta renouvelés",
+			"examines", report.Checked,
+			"renouveles", report.Refreshed,
+			"a_reconnecter", len(report.Expired))
+		for _, tenantID := range report.Expired {
+			logger.Warn("jeton Meta non renouvelable, reconnexion requise", "tenant_id", tenantID)
+		}
+	}
+
+	sweep()
+	ticker := time.NewTicker(tokenRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweep()
 		}
 	}
 }

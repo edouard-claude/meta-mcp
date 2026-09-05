@@ -44,8 +44,12 @@ func (s *stubOAuth) ExchangeCode(context.Context, string, string) (string, error
 	return "SHORT", s.err
 }
 
-func (s *stubOAuth) ExchangeLongLivedToken(context.Context, string) (string, error) {
-	return "LONG", nil
+func (s *stubOAuth) ExchangeLongLivedToken(context.Context, string) (domain.LongLivedToken, error) {
+	return domain.LongLivedToken{Token: "LONG", ExpiresIn: 60 * 24 * time.Hour}, nil
+}
+
+func (s *stubOAuth) DebugToken(context.Context, string) (domain.TokenStatus, error) {
+	return domain.TokenStatus{Valid: true}, nil
 }
 
 func (s *stubOAuth) Me(context.Context, string) (domain.MetaUser, error) { return s.user, nil }

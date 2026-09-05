@@ -379,3 +379,69 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 		store.Close()
 	}
 }
+
+func TestTokenExpiryRoundTrips(t *testing.T) {
+	s := newTestStore(t)
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Second)
+	expiry := now.Add(60 * 24 * time.Hour)
+
+	tenant := seedTenant(t, s, "tenant-a", "meta-1", "tok")
+	tenant.UserTokenExpiresAt = expiry
+	if err := s.UpsertTenant(ctx, tenant); err != nil {
+		t.Fatalf("UpsertTenant: %v", err)
+	}
+
+	got, err := s.TenantByID(ctx, "tenant-a")
+	if err != nil {
+		t.Fatalf("TenantByID: %v", err)
+	}
+	if !got.UserTokenExpiresAt.Equal(expiry) {
+		t.Fatalf("expiration = %v, attendu %v", got.UserTokenExpiresAt, expiry)
+	}
+
+	// An unknown deadline stays unknown rather than becoming the epoch.
+	tenant.UserTokenExpiresAt = time.Time{}
+	if err := s.UpsertTenant(ctx, tenant); err != nil {
+		t.Fatalf("UpsertTenant: %v", err)
+	}
+	if got, err = s.TenantByID(ctx, "tenant-a"); err != nil {
+		t.Fatalf("TenantByID: %v", err)
+	}
+	if !got.UserTokenExpiresAt.IsZero() {
+		t.Fatalf("expiration = %v, attendue inconnue", got.UserTokenExpiresAt)
+	}
+}
+
+func TestTenantsDueForTokenRefresh(t *testing.T) {
+	s := newTestStore(t)
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	withExpiry := func(id, metaUserID string, expiry time.Time) {
+		t.Helper()
+		tenant := seedTenant(t, s, id, metaUserID, "tok-"+id)
+		tenant.UserTokenExpiresAt = expiry
+		if err := s.UpsertTenant(ctx, tenant); err != nil {
+			t.Fatalf("UpsertTenant: %v", err)
+		}
+	}
+	withExpiry("inconnu", "meta-0", time.Time{})
+	withExpiry("bientot", "meta-1", now.Add(3*24*time.Hour))
+	withExpiry("lointain", "meta-2", now.Add(50*24*time.Hour))
+
+	due, err := s.TenantsDueForTokenRefresh(ctx, now.Add(14*24*time.Hour))
+	if err != nil {
+		t.Fatalf("TenantsDueForTokenRefresh: %v", err)
+	}
+	ids := map[string]bool{}
+	for _, tenant := range due {
+		ids[tenant.ID] = true
+		if tenant.UserToken != "tok-"+tenant.ID {
+			t.Fatalf("jeton non déchiffré: %+v", tenant)
+		}
+	}
+	if len(due) != 2 || !ids["inconnu"] || !ids["bientot"] {
+		t.Fatalf("tenants à renouveler = %v", ids)
+	}
+}

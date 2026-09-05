@@ -51,23 +51,68 @@ func (c *Client) ExchangeCode(ctx context.Context, code, redirectURI string) (st
 	return resp.AccessToken, nil
 }
 
-// ExchangeLongLivedToken upgrades a short-lived user token to the 60 day one
-// we actually store.
-func (c *Client) ExchangeLongLivedToken(ctx context.Context, shortToken string) (string, error) {
+// ExchangeLongLivedToken upgrades a token to the 60 day one we store. Meta
+// accepts both a fresh short-lived token and a still valid long-lived one, so
+// the same call serves the login and the periodic renewal.
+func (c *Client) ExchangeLongLivedToken(ctx context.Context, token string) (domain.LongLivedToken, error) {
 	params := url.Values{
 		"grant_type":        {"fb_exchange_token"},
 		"client_id":         {c.appID},
 		"client_secret":     {c.appSecret},
-		"fb_exchange_token": {shortToken},
+		"fb_exchange_token": {token},
 	}
 	var resp tokenResponse
 	if err := c.get(ctx, "", "oauth/access_token", params, &resp); err != nil {
-		return "", fmt.Errorf("obtention du jeton longue durée: %w", err)
+		return domain.LongLivedToken{}, fmt.Errorf("obtention du jeton longue durée: %w", err)
 	}
 	if resp.AccessToken == "" {
-		return "", fmt.Errorf("obtention du jeton longue durée: aucun access_token dans la réponse")
+		return domain.LongLivedToken{}, fmt.Errorf("obtention du jeton longue durée: aucun access_token dans la réponse")
 	}
-	return resp.AccessToken, nil
+	return domain.LongLivedToken{
+		Token:     resp.AccessToken,
+		ExpiresIn: time.Duration(resp.ExpiresIn) * time.Second,
+	}, nil
+}
+
+// DebugToken asks Meta what it thinks of a token: whether it is still valid,
+// when it dies, and which permissions were actually granted.
+func (c *Client) DebugToken(ctx context.Context, token string) (domain.TokenStatus, error) {
+	params := url.Values{
+		"input_token":  {token},
+		"access_token": {c.appID + "|" + c.appSecret},
+	}
+	var resp struct {
+		Data struct {
+			AppID       string   `json:"app_id"`
+			IsValid     bool     `json:"is_valid"`
+			ExpiresAt   int64    `json:"expires_at"`
+			DataAccess  int64    `json:"data_access_expires_at"`
+			Scopes      []string `json:"scopes"`
+			UserID      string   `json:"user_id"`
+			Type        string   `json:"type"`
+			Application string   `json:"application"`
+			Error       struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		} `json:"data"`
+	}
+	// The app access token authenticates this call, so no bearer of our own.
+	if err := c.get(ctx, "", "debug_token", params, &resp); err != nil {
+		return domain.TokenStatus{}, fmt.Errorf("diagnostic du jeton: %w", err)
+	}
+
+	status := domain.TokenStatus{
+		Valid:  resp.Data.IsValid,
+		Scopes: resp.Data.Scopes,
+		Reason: resp.Data.Error.Message,
+	}
+	if resp.Data.ExpiresAt > 0 {
+		status.ExpiresAt = time.Unix(resp.Data.ExpiresAt, 0).UTC()
+	}
+	if resp.Data.DataAccess > 0 {
+		status.DataAccessExpiresAt = time.Unix(resp.Data.DataAccess, 0).UTC()
+	}
+	return status, nil
 }
 
 // Me returns the Facebook identity behind a user token.

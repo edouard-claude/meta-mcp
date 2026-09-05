@@ -14,6 +14,18 @@ type Tenant struct {
 	UserToken   string    `json:"-"` // long-lived Meta user token, never serialized
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+
+	// UserTokenExpiresAt is when Meta says the user token dies. The zero
+	// value means unknown, which the refresh sweep treats as "renew now".
+	UserTokenExpiresAt time.Time `json:"user_token_expires_at,omitzero"`
+}
+
+// TokenExpiresWithin reports whether the user token is due for renewal.
+func (t *Tenant) TokenExpiresWithin(now time.Time, window time.Duration) bool {
+	if t.UserTokenExpiresAt.IsZero() {
+		return true
+	}
+	return t.UserTokenExpiresAt.Before(now.Add(window))
 }
 
 // Page is a Facebook Page owned by a tenant, together with the Instagram

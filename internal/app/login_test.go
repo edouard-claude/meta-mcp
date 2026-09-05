@@ -14,13 +14,16 @@ import (
 type fakeMetaOAuth struct {
 	shortToken string
 	longToken  string
+	longTTL    time.Duration
 	user       domain.MetaUser
 	pages      []domain.Page
+	status     domain.TokenStatus
 
 	exchangeErr error
 	longErr     error
 	meErr       error
 	accountsErr error
+	statusErr   error
 
 	seenCode        string
 	seenRedirectURI string
@@ -33,6 +36,8 @@ func newFakeMeta() *fakeMetaOAuth {
 	return &fakeMetaOAuth{
 		shortToken: "SHORT",
 		longToken:  "LONG",
+		longTTL:    60 * 24 * time.Hour,
+		status:     domain.TokenStatus{Valid: true, Scopes: []string{"pages_show_list"}},
 		user:       domain.MetaUser{ID: "meta-1", Name: "Édouard"},
 		pages: []domain.Page{
 			{PageID: "page-1", Name: "Page 1", PageToken: "PT1", IGUserID: "ig-1", IGUsername: "un"},
@@ -50,14 +55,19 @@ func (f *fakeMetaOAuth) ExchangeCode(_ context.Context, code, redirectURI string
 	return f.shortToken, f.exchangeErr
 }
 
-func (f *fakeMetaOAuth) ExchangeLongLivedToken(_ context.Context, short string) (string, error) {
+func (f *fakeMetaOAuth) ExchangeLongLivedToken(_ context.Context, token string) (domain.LongLivedToken, error) {
 	if f.longErr != nil {
-		return "", f.longErr
+		return domain.LongLivedToken{}, f.longErr
 	}
-	if short != f.shortToken {
-		return "", errors.New("jeton court inattendu")
+	// Meta accepts both a short-lived token and a still valid long-lived one.
+	if token != f.shortToken && token != f.longToken {
+		return domain.LongLivedToken{}, errors.New("jeton inattendu")
 	}
-	return f.longToken, nil
+	return domain.LongLivedToken{Token: f.longToken, ExpiresIn: f.longTTL}, nil
+}
+
+func (f *fakeMetaOAuth) DebugToken(context.Context, string) (domain.TokenStatus, error) {
+	return f.status, f.statusErr
 }
 
 func (f *fakeMetaOAuth) Me(_ context.Context, userToken string) (domain.MetaUser, error) {

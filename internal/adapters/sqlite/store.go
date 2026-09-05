@@ -61,52 +61,112 @@ func (s *Store) UpsertTenant(ctx context.Context, t *domain.Tenant) error {
 	if err != nil {
 		return fmt.Errorf("encrypt user token: %w", err)
 	}
-	const q = `INSERT INTO tenants (id, meta_user_id, display_name, user_token_enc, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+	const q = `INSERT INTO tenants
+		(id, meta_user_id, display_name, user_token_enc, created_at, updated_at, user_token_expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(meta_user_id) DO UPDATE SET
-			display_name   = excluded.display_name,
-			user_token_enc = excluded.user_token_enc,
-			updated_at     = excluded.updated_at`
+			display_name          = excluded.display_name,
+			user_token_enc        = excluded.user_token_enc,
+			updated_at            = excluded.updated_at,
+			user_token_expires_at = excluded.user_token_expires_at`
 	if _, err := s.db.ExecContext(ctx, q,
-		t.ID, t.MetaUserID, t.DisplayName, enc, t.CreatedAt.Unix(), t.UpdatedAt.Unix(),
+		t.ID, t.MetaUserID, t.DisplayName, enc,
+		t.CreatedAt.Unix(), t.UpdatedAt.Unix(), unixOrZero(t.UserTokenExpiresAt),
 	); err != nil {
 		return fmt.Errorf("upsert tenant: %w", err)
 	}
 	return nil
 }
 
+// unixOrZero stores the zero time as 0 rather than a negative epoch.
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
+}
+
+// timeOrZero is the inverse of unixOrZero.
+func timeOrZero(sec int64) time.Time {
+	if sec <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(sec, 0).UTC()
+}
+
 // TenantByID loads a tenant by its internal uuid.
 func (s *Store) TenantByID(ctx context.Context, id string) (*domain.Tenant, error) {
-	return s.tenantBy(ctx, `SELECT id, meta_user_id, display_name, user_token_enc, created_at, updated_at
-		FROM tenants WHERE id = ?`, id)
+	return s.tenantBy(ctx, tenantColumns+` FROM tenants WHERE id = ?`, id)
 }
 
 // TenantByMetaUserID loads a tenant by the Facebook user id behind it.
 func (s *Store) TenantByMetaUserID(ctx context.Context, metaUserID string) (*domain.Tenant, error) {
-	return s.tenantBy(ctx, `SELECT id, meta_user_id, display_name, user_token_enc, created_at, updated_at
-		FROM tenants WHERE meta_user_id = ?`, metaUserID)
+	return s.tenantBy(ctx, tenantColumns+` FROM tenants WHERE meta_user_id = ?`, metaUserID)
 }
 
+// tenantColumns is the column list every tenant query selects, in the order
+// scanTenant expects.
+const tenantColumns = `SELECT id, meta_user_id, display_name, user_token_enc,
+	created_at, updated_at, user_token_expires_at`
+
 func (s *Store) tenantBy(ctx context.Context, query string, arg any) (*domain.Tenant, error) {
-	var (
-		t                    domain.Tenant
-		enc                  []byte
-		createdAt, updatedAt int64
-	)
-	err := s.db.QueryRowContext(ctx, query, arg).
-		Scan(&t.ID, &t.MetaUserID, &t.DisplayName, &enc, &createdAt, &updatedAt)
+	t, err := s.scanTenant(s.db.QueryRowContext(ctx, query, arg))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
-	if err != nil {
+	return t, err
+}
+
+func (s *Store) scanTenant(sc scanner) (*domain.Tenant, error) {
+	var (
+		t                               domain.Tenant
+		enc                             []byte
+		createdAt, updatedAt, expiresAt int64
+	)
+	if err := sc.Scan(&t.ID, &t.MetaUserID, &t.DisplayName, &enc,
+		&createdAt, &updatedAt, &expiresAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("select tenant: %w", err)
 	}
-	if t.UserToken, err = s.cipher.Decrypt(enc); err != nil {
+	token, err := s.cipher.Decrypt(enc)
+	if err != nil {
 		return nil, fmt.Errorf("decrypt user token: %w", err)
 	}
+	t.UserToken = token
 	t.CreatedAt = time.Unix(createdAt, 0).UTC()
 	t.UpdatedAt = time.Unix(updatedAt, 0).UTC()
+	t.UserTokenExpiresAt = timeOrZero(expiresAt)
 	return &t, nil
+}
+
+// TenantsDueForTokenRefresh lists the tenants whose Meta user token dies
+// before deadline. A stored 0 means the deadline is unknown, which happens for
+// rows created before the expiry column existed; those are refreshed too, so
+// they gain a real deadline on the first sweep.
+func (s *Store) TenantsDueForTokenRefresh(ctx context.Context, deadline time.Time) ([]domain.Tenant, error) {
+	const q = tenantColumns + ` FROM tenants
+		WHERE user_token_expires_at = 0 OR user_token_expires_at < ?
+		ORDER BY user_token_expires_at`
+	rows, err := s.db.QueryContext(ctx, q, deadline.Unix())
+	if err != nil {
+		return nil, fmt.Errorf("select tenants to refresh: %w", err)
+	}
+	defer rows.Close()
+
+	tenants := []domain.Tenant{}
+	for rows.Next() {
+		t, err := s.scanTenant(rows)
+		if err != nil {
+			return nil, err
+		}
+		tenants = append(tenants, *t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tenants: %w", err)
+	}
+	return tenants, nil
 }
 
 // DeleteTenant removes a tenant and, through the foreign key, its pages. Its
