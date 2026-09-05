@@ -315,3 +315,68 @@ func TestLimitCapsTheNumberOfItems(t *testing.T) {
 		t.Fatalf("%d publications, attendu 1", len(posts))
 	}
 }
+
+// TestPagePostsFallsBackWhenInlineInsightsAreRefused covers what the real
+// Graph does: a deprecated metric inside the fields expansion fails the whole
+// listing, and the posts are worth more than their numbers.
+func TestPagePostsFallsBackWhenInlineInsightsAreRefused(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /page-1/posts", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Query().Get("fields"), "insights") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"(#100) The value must be a valid insights metric","type":"OAuthException","code":100}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"page-1_1","message":"Sans chiffres","created_time":"2026-09-01T10:00:00+0000","permalink_url":"https://facebook.test/1"}]}`))
+	})
+
+	posts, err := g.newTestClient().PagePosts(t.Context(), "PT", "page-1", testSince, 25)
+	if err != nil {
+		t.Fatalf("PagePosts: %v", err)
+	}
+	if len(posts) != 1 || posts[0].PostID != "page-1_1" {
+		t.Fatalf("publications = %+v", posts)
+	}
+	if posts[0].ImpressionsUnique != 0 || posts[0].Reactions != 0 {
+		t.Fatalf("des chiffres sont apparus sans insights: %+v", posts[0])
+	}
+	if n := len(g.calls("/page-1/posts")); n != 2 {
+		t.Fatalf("%d appels, attendu 2 (avec puis sans insights)", n)
+	}
+}
+
+// TestPagePostsDoesNotRetryOnRealFailures keeps the fallback narrow: an
+// expired token must not come back as an empty listing.
+func TestPagePostsDoesNotRetryOnRealFailures(t *testing.T) {
+	g := newFakeGraph(t)
+	g.fail("GET /page-1/posts", "error_190.json", http.StatusBadRequest, nil)
+
+	if _, err := g.newTestClient().PagePosts(t.Context(), "PT", "page-1", testSince, 25); err == nil {
+		t.Fatal("aucune erreur")
+	}
+	if n := len(g.calls("/page-1/posts")); n != 1 {
+		t.Fatalf("%d appels, attendu 1", n)
+	}
+}
+
+func TestIGMediaFallsBackWhenInlineInsightsAreRefused(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /ig-1/media", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Query().Get("fields"), "insights") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"(#100) bad metric","type":"OAuthException","code":100}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"m-1","media_type":"IMAGE","like_count":12,"comments_count":3}]}`))
+	})
+
+	media, err := g.newTestClient().IGMedia(t.Context(), "PT", "ig-1", testSince, 25)
+	if err != nil {
+		t.Fatalf("IGMedia: %v", err)
+	}
+	if len(media) != 1 || media[0].LikeCount != 12 || media[0].Reach != 0 {
+		t.Fatalf("médias = %+v", media)
+	}
+}

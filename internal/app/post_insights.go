@@ -12,7 +12,6 @@ import (
 // behind the three numbers page_posts already flattens into its listing.
 var DefaultPostMetrics = []string{
 	"post_impressions",
-	"post_impressions_unique",
 	"post_clicks",
 	"post_reactions_by_type_total",
 	"post_video_views",

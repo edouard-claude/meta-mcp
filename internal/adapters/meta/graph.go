@@ -17,13 +17,24 @@ var _ domain.GraphClient = (*Client)(nil)
 // Field sets requested from the Graph API, kept next to the call that uses
 // them so a change to one never silently breaks the decoding of another.
 const (
+	// postFields inlines the post insights so a listing costs one request.
+	// post_impressions_unique is gone from the set: Meta deprecated it and
+	// rejects the whole expansion when it appears.
 	postFields = "id,message,created_time,permalink_url," +
-		"insights.metric(post_impressions_unique,post_clicks,post_reactions_by_type_total)"
+		"insights.metric(post_impressions,post_clicks,post_reactions_by_type_total)"
+	// postFieldsPlain drops the expansion entirely. It is the fallback when
+	// Meta refuses the inlined metrics, so a deprecated metric costs the
+	// caller its numbers rather than the whole listing.
+	postFieldsPlain = "id,message,created_time,permalink_url"
 	commentFields   = "id,from{name},message,created_time"
 	igCommentFields = "id,username,text,timestamp"
 	igMediaFields   = "id,caption,media_type,media_product_type,timestamp,permalink," +
 		"like_count,comments_count," +
 		"insights.metric(reach,views,saved,shares,total_interactions)"
+	// igMediaFieldsPlain is the same fallback as postFieldsPlain: keep the
+	// media even when Meta refuses the inlined insights.
+	igMediaFieldsPlain = "id,caption,media_type,media_product_type,timestamp,permalink," +
+		"like_count,comments_count"
 )
 
 // insightItem is one entry of an /insights response. Facebook fills Values;
@@ -162,7 +173,16 @@ func (c *Client) PagePosts(ctx context.Context, pageToken, pageID string, since 
 
 	items, err := c.collect(ctx, pageToken, pageID+"/posts", params, limit)
 	if err != nil {
-		return nil, fmt.Errorf("publications de la page: %w", err)
+		// A metric Meta no longer serves condemns the whole expansion. The
+		// posts themselves are still readable, and a listing without its
+		// numbers beats no listing at all.
+		if ge, ok := domain.AsGraphError(err); !ok || ge.Code != codeUnsupportedMetric {
+			return nil, fmt.Errorf("publications de la page: %w", err)
+		}
+		params.Set("fields", postFieldsPlain)
+		if items, err = c.collect(ctx, pageToken, pageID+"/posts", params, limit); err != nil {
+			return nil, fmt.Errorf("publications de la page: %w", err)
+		}
 	}
 
 	posts := make([]domain.Post, 0, len(items))
@@ -350,7 +370,13 @@ func (c *Client) IGMedia(ctx context.Context, pageToken, igUserID string, since 
 
 	items, err := c.collect(ctx, pageToken, igUserID+"/media", params, limit)
 	if err != nil {
-		return nil, fmt.Errorf("médias Instagram: %w", err)
+		if ge, ok := domain.AsGraphError(err); !ok || ge.Code != codeUnsupportedMetric {
+			return nil, fmt.Errorf("médias Instagram: %w", err)
+		}
+		params.Set("fields", igMediaFieldsPlain)
+		if items, err = c.collect(ctx, pageToken, igUserID+"/media", params, limit); err != nil {
+			return nil, fmt.Errorf("médias Instagram: %w", err)
+		}
 	}
 
 	media := make([]domain.Media, 0, len(items))
