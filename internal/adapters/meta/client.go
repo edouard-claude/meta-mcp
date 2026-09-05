@@ -256,6 +256,24 @@ func truncate(s string, n int) string {
 	return s[:n] + "…"
 }
 
+// fetchPage reads a single page of a list endpoint, without following the
+// cursor.
+//
+// Insights edges must go through this rather than collect: their paging.next
+// does not continue a list, it steps to the previous or next time window, so
+// following it returns the same metrics again for a period nobody asked for.
+func (c *Client) fetchPage(ctx context.Context, token, path string, params url.Values) ([]json.RawMessage, error) {
+	body, err := c.call(ctx, http.MethodGet, c.endpoint(path), token, params)
+	if err != nil {
+		return nil, err
+	}
+	var resp graphResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("décodage de la réponse: %w", err)
+	}
+	return resp.Data, nil
+}
+
 // collect walks a paginated endpoint, following paging.next until the limit
 // is reached, the cursor runs out, or maxPages is hit.
 func (c *Client) collect(ctx context.Context, token, path string, params url.Values, limit int) ([]json.RawMessage, error) {

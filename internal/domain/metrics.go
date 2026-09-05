@@ -38,14 +38,17 @@ type InsightMeta struct {
 }
 
 // Post is a Facebook Page post with its organic insights flattened.
+//
+// There is deliberately no impressions field: Meta deprecated every post
+// impressions metric, and reporting a permanent zero would read as data.
 type Post struct {
-	PostID            string `json:"post_id"`
-	CreatedTime       string `json:"created_time"`
-	Message           string `json:"message,omitempty"`
-	Permalink         string `json:"permalink,omitempty"`
-	ImpressionsUnique int64  `json:"impressions_unique"`
-	Clicks            int64  `json:"clicks"`
-	Reactions         int64  `json:"reactions"`
+	PostID      string `json:"post_id"`
+	CreatedTime string `json:"created_time"`
+	Message     string `json:"message,omitempty"`
+	Permalink   string `json:"permalink,omitempty"`
+	Clicks      int64  `json:"clicks"`
+	Reactions   int64  `json:"reactions"`
+	VideoViews  int64  `json:"video_views,omitempty"`
 }
 
 // Comment is a comment on a Page post or on an Instagram media.

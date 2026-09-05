@@ -18,10 +18,12 @@ var _ domain.GraphClient = (*Client)(nil)
 // them so a change to one never silently breaks the decoding of another.
 const (
 	// postFields inlines the post insights so a listing costs one request.
-	// post_impressions_unique is gone from the set: Meta deprecated it and
-	// rejects the whole expansion when it appears.
+	// The whole post impressions family is gone: Meta deprecated
+	// post_impressions, post_impressions_unique, post_impressions_organic,
+	// post_engaged_users and post_activity, and rejects the entire expansion
+	// as soon as one of them appears.
 	postFields = "id,message,created_time,permalink_url," +
-		"insights.metric(post_impressions,post_clicks,post_reactions_by_type_total)"
+		"insights.metric(post_clicks,post_reactions_by_type_total)"
 	// postFieldsPlain drops the expansion entirely. It is the fallback when
 	// Meta refuses the inlined metrics, so a deprecated metric costs the
 	// caller its numbers rather than the whole listing.
@@ -142,7 +144,7 @@ func (c *Client) insights(ctx context.Context, token, path string, base url.Valu
 	}
 	params.Set("metric", strings.Join(metrics, ","))
 
-	items, err := c.collect(ctx, token, path, params, 0)
+	items, err := c.fetchPage(ctx, token, path, params)
 	if err != nil {
 		return domain.InsightSet{}, err
 	}
@@ -199,12 +201,12 @@ func (c *Client) PagePosts(ctx context.Context, pageToken, pageID string, since 
 		}
 		for _, in := range item.Insights.Data {
 			switch in.Name {
-			case "post_impressions_unique":
-				post.ImpressionsUnique = firstMetricValue(in)
 			case "post_clicks":
 				post.Clicks = firstMetricValue(in)
 			case "post_reactions_by_type_total":
 				post.Reactions = firstMetricValue(in)
+			case "post_video_views":
+				post.VideoViews = firstMetricValue(in)
 			}
 		}
 		posts = append(posts, post)
@@ -323,7 +325,7 @@ func (c *Client) IGFollowerDemographics(ctx context.Context, pageToken, igUserID
 		"metric_type": {"total_value"},
 		"breakdown":   {breakdown},
 	}
-	items, err := c.collect(ctx, pageToken, igUserID+"/insights", params, 0)
+	items, err := c.fetchPage(ctx, pageToken, igUserID+"/insights", params)
 	if err != nil {
 		return nil, fmt.Errorf("démographie des abonnés: %w", err)
 	}

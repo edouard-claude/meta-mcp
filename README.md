@@ -299,7 +299,7 @@ Ask *"list my pages"*: `list_pages` should answer with the Pages of that account
 | `sync_pages` | Re-reads the Pages from Meta and replaces the list |
 | `page_insights` | Daily organic metrics of a Page over a window |
 | `page_insights_metadata` | Catalogue of metric names the server knows how to request |
-| `page_posts` | Recent posts with unique impressions, clicks, reactions |
+| `page_posts` | Recent posts with clicks, reactions and video views |
 | `page_post_comments` | Comments on a post |
 | `ig_account_insights` | Reach, views, profile views, engaged accounts, interactions, followers |
 | `ig_follower_demographics` | Follower breakdown by `city`, `country`, `age` or `gender` |
@@ -315,6 +315,11 @@ Ask *"list my pages"*: `list_pages` should answer with the Pages of that account
 `since` and `until` are `YYYY-MM-DD`. The insights tools default to the last 28 days;
 `page_posts` and `ig_media` apply no lower bound at all when `since` is absent, so a
 page that publishes twice a month does not come back empty.
+
+Meta has deprecated the entire post impressions family (`post_impressions`,
+`post_impressions_unique`, `post_impressions_organic`, `post_engaged_users`,
+`post_activity`), so `page_posts` reports clicks, reactions and video views and no
+impressions at all rather than a permanent zero dressed up as data.
 
 Meta rejects a whole insights batch when one metric name is unsupported on that
 object. Rather than failing, the server retries metric by metric and returns what it

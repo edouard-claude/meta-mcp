@@ -10,10 +10,13 @@ import (
 
 // DefaultPostMetrics is what page_post_insights reads by default: the detail
 // behind the three numbers page_posts already flattens into its listing.
+// The impressions family is absent on purpose: measured against the live
+// Graph API, post_impressions, post_impressions_unique, post_impressions_organic,
+// post_engaged_users and post_activity are all rejected with code 100.
 var DefaultPostMetrics = []string{
-	"post_impressions",
 	"post_clicks",
 	"post_reactions_by_type_total",
+	"post_reactions_like_total",
 	"post_video_views",
 }
 

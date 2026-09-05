@@ -129,14 +129,14 @@ func TestPagePostsFlattensInsights(t *testing.T) {
 	if first.PostID != "page-1_111" || first.Message != "Nouvelle fournée" {
 		t.Fatalf("publication = %+v", first)
 	}
-	if first.ImpressionsUnique != 540 || first.Clicks != 23 {
+	if first.Clicks != 23 {
 		t.Fatalf("statistiques = %+v", first)
 	}
 	// Reactions come back as an object keyed by type and must be summed.
 	if first.Reactions != 37 {
 		t.Fatalf("réactions = %d, attendu 37", first.Reactions)
 	}
-	if posts[1].Reactions != 0 || posts[1].ImpressionsUnique != 0 {
+	if posts[1].Reactions != 0 || posts[1].Clicks != 0 {
 		t.Fatalf("publication sans insights = %+v", posts[1])
 	}
 
@@ -338,7 +338,7 @@ func TestPagePostsFallsBackWhenInlineInsightsAreRefused(t *testing.T) {
 	if len(posts) != 1 || posts[0].PostID != "page-1_1" {
 		t.Fatalf("publications = %+v", posts)
 	}
-	if posts[0].ImpressionsUnique != 0 || posts[0].Reactions != 0 {
+	if posts[0].Clicks != 0 || posts[0].Reactions != 0 {
 		t.Fatalf("des chiffres sont apparus sans insights: %+v", posts[0])
 	}
 	if n := len(g.calls("/page-1/posts")); n != 2 {
@@ -378,5 +378,52 @@ func TestIGMediaFallsBackWhenInlineInsightsAreRefused(t *testing.T) {
 	}
 	if len(media) != 1 || media[0].LikeCount != 12 || media[0].Reach != 0 {
 		t.Fatalf("médias = %+v", media)
+	}
+}
+
+// TestInsightsDoNotFollowPagination pins the bug the live API exposed: on an
+// insights edge, paging.next steps to another time window rather than
+// continuing a list, so following it returned each metric several times.
+func TestInsightsDoNotFollowPagination(t *testing.T) {
+	g := newFakeGraph(t)
+	calls := 0
+	g.handle("GET /page-1_1/insights", func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		// Meta always offers a next window; a paginating client would loop
+		// on it and duplicate every metric.
+		_, _ = w.Write([]byte(`{"data":[{"name":"post_clicks","period":"lifetime","values":[{"value":23}]}],
+			"paging":{"next":"` + g.URL() + `/v26.0/page-1_1/insights?after=2"}}`))
+	})
+
+	set, err := g.newTestClient().PostInsights(t.Context(), "PT", "page-1_1", []string{"post_clicks"})
+	if err != nil {
+		t.Fatalf("PostInsights: %v", err)
+	}
+	if len(set.Insights) != 1 {
+		t.Fatalf("%d entrées, attendu 1: %+v", len(set.Insights), set.Insights)
+	}
+	if calls != 1 {
+		t.Fatalf("%d appels, attendu 1: le curseur a été suivi", calls)
+	}
+}
+
+func TestDemographicsDoNotFollowPaginationEither(t *testing.T) {
+	g := newFakeGraph(t)
+	calls := 0
+	g.handle("GET /ig-1/insights", func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		body := g.fixture("ig_demographics.json")
+		body = body[:len(body)-2] + `,"paging":{"next":"` + g.URL() + `/v26.0/ig-1/insights?after=2"}}`
+		_, _ = w.Write([]byte(body))
+	})
+
+	breakdowns, err := g.newTestClient().IGFollowerDemographics(t.Context(), "PT", "ig-1", "city")
+	if err != nil {
+		t.Fatalf("IGFollowerDemographics: %v", err)
+	}
+	if len(breakdowns) != 2 || calls != 1 {
+		t.Fatalf("%d entrées en %d appels", len(breakdowns), calls)
 	}
 }

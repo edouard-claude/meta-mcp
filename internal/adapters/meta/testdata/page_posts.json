@@ -7,7 +7,7 @@
       "permalink_url": "https://www.facebook.com/page-1/posts/111",
       "insights": {
         "data": [
-          {"name": "post_impressions_unique", "period": "lifetime", "values": [{"value": 540}]},
+          {"name": "post_video_views", "period": "lifetime", "values": [{"value": 540}]},
           {"name": "post_clicks", "period": "lifetime", "values": [{"value": 23}]},
           {"name": "post_reactions_by_type_total", "period": "lifetime",
            "values": [{"value": {"like": 30, "love": 5, "wow": 2}}]}

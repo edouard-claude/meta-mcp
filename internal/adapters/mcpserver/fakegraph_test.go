@@ -95,7 +95,7 @@ func (f *fakeGraph) PagePosts(_ context.Context, token, pageID string, _ time.Ti
 	if err := f.record("PagePosts", token, pageID); err != nil {
 		return nil, err
 	}
-	return []domain.Post{{PostID: pageID + "_1", Message: "Bonjour", ImpressionsUnique: 10}}, nil
+	return []domain.Post{{PostID: pageID + "_1", Message: "Bonjour", Clicks: 10}}, nil
 }
 
 func (f *fakeGraph) PostComments(_ context.Context, token, postID string, _ int) ([]domain.Comment, error) {
