@@ -100,6 +100,22 @@ const (
 	IGMediaTypeImage    = "IMAGE"
 	IGMediaTypeReels    = "REELS"
 	IGMediaTypeCarousel = "CAROUSEL"
+	IGMediaTypeStories  = "STORIES"
+)
+
+// ScheduledPost is a Page post Meta is holding until its publication time.
+type ScheduledPost struct {
+	PostID      string `json:"post_id"`
+	Message     string `json:"message,omitempty"`
+	CreatedTime string `json:"created_time,omitempty"`
+	ScheduledAt string `json:"scheduled_at,omitempty"`
+}
+
+// Comment moderation actions accepted by the moderation tools.
+const (
+	ModerationHide   = "hide"
+	ModerationUnhide = "unhide"
+	ModerationDelete = "delete"
 )
 
 // IGPublishRequest describes an Instagram publication. Meta requires a two

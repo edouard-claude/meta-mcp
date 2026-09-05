@@ -17,6 +17,12 @@ type fakeGraph struct {
 
 	err   error
 	calls []graphCall
+
+	lastHidden    bool
+	lastInstagram bool
+
+	status    domain.TokenStatus
+	statusErr error
 }
 
 type graphCall struct {
@@ -32,7 +38,16 @@ type graphCall struct {
 var _ domain.GraphClient = (*fakeGraph)(nil)
 
 func newFakeGraph() *fakeGraph {
-	return &fakeGraph{fakeMetaOAuth: *newFakeMeta()}
+	return &fakeGraph{
+		fakeMetaOAuth: *newFakeMeta(),
+		status:        domain.TokenStatus{Valid: true},
+	}
+}
+
+// DebugToken shadows the embedded fakeMetaOAuth so a test can drive the
+// connection diagnostic without touching the login fake.
+func (f *fakeGraph) DebugToken(context.Context, string) (domain.TokenStatus, error) {
+	return f.status, f.statusErr
 }
 
 func (f *fakeGraph) record(c graphCall) error {
@@ -141,7 +156,7 @@ func newServiceHarness(t *testing.T) (*Service, *fakeStore, *fakeGraph, *fakeClo
 	store.seedTenant("tenant-b", "meta-b", "USER-B", domain.Page{
 		PageID: "page-b", Name: "Page B", PageToken: "PT-B", SyncedAt: clk.Now(),
 	})
-	return NewService(store, graph, clk, "https://mcp.example.re"), store, graph, clk
+	return NewService(store, graph, clk, "https://mcp.example.re", []string{"pages_show_list", "instagram_basic"}), store, graph, clk
 }
 
 func TestListPagesReturnsOnlyTheTenantPages(t *testing.T) {
@@ -700,4 +715,43 @@ func TestKnownMetricsExcludeDeprecatedAndInstagramWithoutAccount(t *testing.T) {
 	if _, err := svc.PageInsightsMetadata(t.Context(), "tenant-a", "page-b"); !errors.Is(err, domain.ErrUnknownPage) {
 		t.Fatalf("erreur = %v", err)
 	}
+}
+
+// ----- new port methods -----
+
+func (f *fakeGraph) PostInsights(_ context.Context, token, postID string, metrics []string) (domain.InsightSet, error) {
+	if err := f.record(graphCall{Method: "PostInsights", Token: token, Object: postID, Metrics: metrics}); err != nil {
+		return domain.InsightSet{}, err
+	}
+	return domain.InsightSet{Insights: []domain.Insight{{Metric: metrics[0]}}}, nil
+}
+
+func (f *fakeGraph) IGMediaInsights(_ context.Context, token, mediaID string, metrics []string) (domain.InsightSet, error) {
+	if err := f.record(graphCall{Method: "IGMediaInsights", Token: token, Object: mediaID, Metrics: metrics}); err != nil {
+		return domain.InsightSet{}, err
+	}
+	return domain.InsightSet{Insights: []domain.Insight{{Metric: metrics[0]}}}, nil
+}
+
+func (f *fakeGraph) ScheduledPosts(_ context.Context, token, pageID string, limit int) ([]domain.ScheduledPost, error) {
+	if err := f.record(graphCall{Method: "ScheduledPosts", Token: token, Object: pageID, Limit: limit}); err != nil {
+		return nil, err
+	}
+	return []domain.ScheduledPost{{PostID: pageID + "_prog", ScheduledAt: "2026-09-10T09:00:00Z"}}, nil
+}
+
+func (f *fakeGraph) IGStories(_ context.Context, token, igUserID string) ([]domain.Media, error) {
+	if err := f.record(graphCall{Method: "IGStories", Token: token, Object: igUserID}); err != nil {
+		return nil, err
+	}
+	return []domain.Media{{MediaID: "story-1", Type: "IMAGE", ProductType: "STORY"}}, nil
+}
+
+func (f *fakeGraph) SetCommentHidden(_ context.Context, token, commentID string, hidden, instagram bool) error {
+	f.lastHidden, f.lastInstagram = hidden, instagram
+	return f.record(graphCall{Method: "SetCommentHidden", Token: token, Object: commentID})
+}
+
+func (f *fakeGraph) DeleteObject(_ context.Context, token, objectID string) error {
+	return f.record(graphCall{Method: "DeleteObject", Token: token, Object: objectID})
 }

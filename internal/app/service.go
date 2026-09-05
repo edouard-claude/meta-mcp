@@ -30,11 +30,20 @@ type Service struct {
 	// publicURL is the base URL of this server, used to build the
 	// reconnection link.
 	publicURL string
+	// requiredScopes is what the login dialog asks for, used by
+	// connection_status to spot a permission the user did not grant.
+	requiredScopes []string
 }
 
 // NewService wires the tool use cases.
-func NewService(store domain.TenantStore, graph domain.GraphClient, clk domain.Clock, publicURL string) *Service {
-	return &Service{store: store, graph: graph, clock: clk, publicURL: publicURL}
+func NewService(store domain.TenantStore, graph domain.GraphClient, clk domain.Clock, publicURL string, requiredScopes []string) *Service {
+	return &Service{
+		store:          store,
+		graph:          graph,
+		clock:          clk,
+		publicURL:      publicURL,
+		requiredScopes: requiredScopes,
+	}
 }
 
 // PageView is what the tools return about a page. It deliberately carries no

@@ -15,6 +15,9 @@ type fakeGraph struct {
 	mu    sync.Mutex
 	calls []graphCall
 	err   error
+
+	lastHidden    bool
+	lastInstagram bool
 }
 
 // graphCall is one recorded call.
@@ -161,4 +164,57 @@ func (f *fakeGraph) IGReplyToComment(_ context.Context, token, commentID, _ stri
 		return "", err
 	}
 	return commentID + "_reply", nil
+}
+
+// ----- detail, scheduling and moderation -----
+
+func (f *fakeGraph) PostInsights(_ context.Context, token, postID string, metrics []string) (domain.InsightSet, error) {
+	if err := f.record("PostInsights", token, postID); err != nil {
+		return domain.InsightSet{}, err
+	}
+	out := make([]domain.Insight, 0, len(metrics))
+	for _, m := range metrics {
+		out = append(out, domain.Insight{Metric: m, Period: "lifetime",
+			Values: []domain.InsightValue{{Value: json.RawMessage(`12`)}}})
+	}
+	return domain.InsightSet{Insights: out}, nil
+}
+
+func (f *fakeGraph) IGMediaInsights(_ context.Context, token, mediaID string, metrics []string) (domain.InsightSet, error) {
+	if err := f.record("IGMediaInsights", token, mediaID); err != nil {
+		return domain.InsightSet{}, err
+	}
+	out := make([]domain.Insight, 0, len(metrics))
+	for _, m := range metrics {
+		out = append(out, domain.Insight{Metric: m,
+			Values: []domain.InsightValue{{Value: json.RawMessage(`5`)}}})
+	}
+	return domain.InsightSet{Insights: out}, nil
+}
+
+func (f *fakeGraph) ScheduledPosts(_ context.Context, token, pageID string, _ int) ([]domain.ScheduledPost, error) {
+	if err := f.record("ScheduledPosts", token, pageID); err != nil {
+		return nil, err
+	}
+	return []domain.ScheduledPost{{
+		PostID: pageID + "_prog", Message: "Bientôt", ScheduledAt: "2026-09-10T09:00:00Z",
+	}}, nil
+}
+
+func (f *fakeGraph) IGStories(_ context.Context, token, igUserID string) ([]domain.Media, error) {
+	if err := f.record("IGStories", token, igUserID); err != nil {
+		return nil, err
+	}
+	return []domain.Media{{MediaID: "story-1", Type: "IMAGE", ProductType: "STORY"}}, nil
+}
+
+func (f *fakeGraph) SetCommentHidden(_ context.Context, token, commentID string, hidden, instagram bool) error {
+	f.mu.Lock()
+	f.lastHidden, f.lastInstagram = hidden, instagram
+	f.mu.Unlock()
+	return f.record("SetCommentHidden", token, commentID)
+}
+
+func (f *fakeGraph) DeleteObject(_ context.Context, token, objectID string) error {
+	return f.record("DeleteObject", token, objectID)
 }

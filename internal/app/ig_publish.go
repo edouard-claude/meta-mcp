@@ -89,6 +89,22 @@ func buildIGPublishRequest(in IGPublishInput) (domain.IGPublishRequest, error) {
 	}
 
 	switch req.MediaType {
+	case domain.IGMediaTypeStories:
+		// A story takes one image or one video, never both, and no caption.
+		if req.ImageURL == "" && req.VideoURL == "" {
+			return req, errors.New("image_url ou video_url est obligatoire pour media_type=STORIES")
+		}
+		if req.ImageURL != "" && req.VideoURL != "" {
+			return req, errors.New("une story porte soit image_url, soit video_url, pas les deux")
+		}
+		field, value := "image_url", req.ImageURL
+		if req.VideoURL != "" {
+			field, value = "video_url", req.VideoURL
+		}
+		if err := validateHTTPSURL(value, field); err != nil {
+			return req, err
+		}
+		req.Caption = ""
 	case domain.IGMediaTypeImage:
 		if req.ImageURL == "" {
 			return req, errors.New("image_url est obligatoire pour media_type=IMAGE")
@@ -121,8 +137,9 @@ func buildIGPublishRequest(in IGPublishInput) (domain.IGPublishRequest, error) {
 		}
 		req.Children = children
 	default:
-		return req, fmt.Errorf("media_type doit valoir %s, %s ou %s",
-			domain.IGMediaTypeImage, domain.IGMediaTypeReels, domain.IGMediaTypeCarousel)
+		return req, fmt.Errorf("media_type doit valoir %s, %s, %s ou %s",
+			domain.IGMediaTypeImage, domain.IGMediaTypeReels,
+			domain.IGMediaTypeCarousel, domain.IGMediaTypeStories)
 	}
 	return req, nil
 }

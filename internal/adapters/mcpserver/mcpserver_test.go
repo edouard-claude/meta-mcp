@@ -86,7 +86,7 @@ func newServerHarness(t *testing.T) *serverHarness {
 	}})
 
 	graph := &fakeGraph{}
-	svc := app.NewService(store, graph, testClock{}, "https://mcp.example.re")
+	svc := app.NewService(store, graph, testClock{}, "https://mcp.example.re", []string{"pages_show_list", "instagram_basic"})
 	handler := Handler(
 		New(svc, slog.New(slog.DiscardHandler)),
 		func(token string) (string, time.Time, error) {

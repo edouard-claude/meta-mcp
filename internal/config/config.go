@@ -94,6 +94,18 @@ func (c *Config) ResourceMetadataURL() string {
 	return c.PublicURL + "/.well-known/oauth-protected-resource"
 }
 
+// ScopeList splits META_SCOPES into the individual permissions, which
+// connection_status compares against what Meta actually granted.
+func (c *Config) ScopeList() []string {
+	out := []string{}
+	for part := range strings.SplitSeq(c.MetaScopes, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // IsMetaUserAllowed reports whether a Facebook user id may create a tenant.
 func (c *Config) IsMetaUserAllowed(metaUserID string) bool {
 	if len(c.AllowedMetaUserIDs) == 0 {

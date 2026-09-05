@@ -167,3 +167,104 @@ func (d *deps) toolIGReplyComment(ctx context.Context, req *mcp.CallToolRequest,
 	}
 	return jsonResult(out)
 }
+
+// registerModerationTools adds the tools that hide, delete or cancel. They
+// are the destructive end of the surface, so their previews say so.
+func (d *deps) registerModerationTools(srv *mcp.Server) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "page_moderate_comment",
+		Title:       "Modérer un commentaire Facebook",
+		Description: "Masque, réaffiche ou supprime un commentaire sur une publication de Page." + confirmDoc,
+		Annotations: moderating(),
+	}, d.toolPageModerateComment)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "ig_moderate_comment",
+		Title:       "Modérer un commentaire Instagram",
+		Description: "Masque, réaffiche ou supprime un commentaire sur une publication Instagram." + confirmDoc,
+		Annotations: moderating(),
+	}, d.toolIGModerateComment)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "page_cancel_scheduled_post",
+		Title:       "Annuler une publication programmée",
+		Description: "Supprime une publication que Meta gardait en attente. L'annulation est définitive : la publication est supprimée, pas mise en pause. Utilisez page_scheduled_posts pour obtenir post_id." + confirmDoc,
+		Annotations: moderating(),
+	}, d.toolPageCancelScheduledPost)
+}
+
+// ModerateCommentArgs are the arguments of the two moderation tools.
+type ModerateCommentArgs struct {
+	CommentID string `json:"comment_id" jsonschema:"Identifiant du commentaire."`
+	Action    string `json:"action" jsonschema:"hide pour masquer, unhide pour réafficher, delete pour supprimer définitivement."`
+	PageID    string `json:"page_id,omitempty" jsonschema:"Page concernée. Facultatif : déduit de comment_id, ou de la seule page connectée."`
+	Confirm   bool   `json:"confirm,omitempty" jsonschema:"Doit valoir true pour appliquer réellement. false ou absent renvoie un aperçu."`
+}
+
+func (d *deps) toolPageModerateComment(ctx context.Context, req *mcp.CallToolRequest, args ModerateCommentArgs) (*mcp.CallToolResult, any, error) {
+	tenant, err := tenantID(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := d.svc.ModerateComment(ctx, tenant, app.ModerateCommentInput{
+		CommentID: args.CommentID,
+		Action:    args.Action,
+		PageID:    args.PageID,
+		Confirm:   args.Confirm,
+	})
+	if err != nil {
+		return nil, nil, d.toolError("page_moderate_comment", err)
+	}
+	if !out.Preview {
+		d.logger.Info("commentaire modéré", "tool", "page_moderate_comment",
+			"action", out.Action, "page_id", out.PageID)
+	}
+	return jsonResult(out)
+}
+
+func (d *deps) toolIGModerateComment(ctx context.Context, req *mcp.CallToolRequest, args ModerateCommentArgs) (*mcp.CallToolResult, any, error) {
+	tenant, err := tenantID(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := d.svc.IGModerateComment(ctx, tenant, app.ModerateCommentInput{
+		CommentID: args.CommentID,
+		Action:    args.Action,
+		PageID:    args.PageID,
+		Confirm:   args.Confirm,
+	})
+	if err != nil {
+		return nil, nil, d.toolError("ig_moderate_comment", err)
+	}
+	if !out.Preview {
+		d.logger.Info("commentaire Instagram modéré", "tool", "ig_moderate_comment",
+			"action", out.Action, "page_id", out.PageID)
+	}
+	return jsonResult(out)
+}
+
+// CancelScheduledPostArgs are the arguments of page_cancel_scheduled_post.
+type CancelScheduledPostArgs struct {
+	PostID  string `json:"post_id" jsonschema:"Identifiant de la publication programmée, obtenu via page_scheduled_posts."`
+	PageID  string `json:"page_id,omitempty" jsonschema:"Page concernée. Facultatif : déduit de post_id, ou de la seule page connectée."`
+	Confirm bool   `json:"confirm,omitempty" jsonschema:"Doit valoir true pour annuler réellement. false ou absent renvoie un aperçu."`
+}
+
+func (d *deps) toolPageCancelScheduledPost(ctx context.Context, req *mcp.CallToolRequest, args CancelScheduledPostArgs) (*mcp.CallToolResult, any, error) {
+	tenant, err := tenantID(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := d.svc.PageCancelScheduledPost(ctx, tenant, app.CancelScheduledPostInput{
+		PostID:  args.PostID,
+		PageID:  args.PageID,
+		Confirm: args.Confirm,
+	})
+	if err != nil {
+		return nil, nil, d.toolError("page_cancel_scheduled_post", err)
+	}
+	if !out.Preview {
+		d.logger.Info("publication programmée annulée", "page_id", out.PageID)
+	}
+	return jsonResult(out)
+}

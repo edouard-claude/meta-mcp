@@ -49,8 +49,10 @@ comments, and publishing.
 - **Its own OAuth 2.1 server.** Dynamic client registration, mandatory PKCE S256,
   rotating refresh tokens, HS256 access tokens. Any conforming MCP client connects
   itself, with no manual token handling.
-- **Fail-closed writes.** Nothing is published without `confirm=true`. Without it,
-  the tool returns a preview and never calls the API.
+- **Fail-closed writes.** Nothing is published, hidden or deleted without
+  `confirm=true`. Without it, the tool returns a preview and never calls the API.
+- **Sessions that do not rot.** Meta user tokens are renewed before they expire, so
+  a connected account keeps working past the 60 day mark on its own.
 - **One static binary.** `CGO_ENABLED=0`, a `distroless` image, a SQLite file on a
   volume. Two dependencies in `go.mod`, both justified there.
 
@@ -303,6 +305,11 @@ Ask *"list my pages"*: `list_pages` should answer with the Pages of that account
 | `ig_follower_demographics` | Follower breakdown by `city`, `country`, `age` or `gender` |
 | `ig_media` | Recent Instagram media with reach, views, saves, shares, interactions |
 | `ig_media_comments` | Comments on an Instagram media |
+| `page_post_insights` | Full metrics of one Page post, beyond the three page_posts flattens |
+| `ig_media_insights` | Full metrics of one Instagram media |
+| `ig_stories` | Stories currently live, which Meta drops after 24 hours |
+| `page_scheduled_posts` | Posts Meta is holding for a future date |
+| `connection_status` | Token validity, expiry, granted permissions, synced pages |
 | `reconnect_url` | Single-use link to re-authorize Facebook |
 
 `since` and `until` are `YYYY-MM-DD`. The insights tools default to the last 28 days;
@@ -321,18 +328,48 @@ maintained catalogue in the code, not a live capability check: the
 |---|---|
 | `page_publish_post` | Publishes a message, a link or a photo, now or scheduled |
 | `page_reply_comment` | Replies to a comment on a Page post |
-| `ig_publish` | Publishes an image, a reel or a carousel |
+| `ig_publish` | Publishes an image, a reel, a carousel or a story |
 | `ig_reply_comment` | Replies to a comment on an Instagram media |
+| `page_moderate_comment` | Hides, unhides or deletes a comment on a Page post |
+| `ig_moderate_comment` | Same on an Instagram media |
+| `page_cancel_scheduled_post` | Deletes a post Meta had not published yet |
+
+The last three are annotated as destructive, so a client can warn before running
+them, and their preview says plainly what cannot be undone.
 
 Scheduling goes through Meta's own `scheduled_publish_time`: `scheduled_at` is an
-ISO 8601 date, between 10 minutes and 6 months out. Instagram publishing is the
-two-step container flow, with the server waiting for Meta to finish processing.
+ISO 8601 date, between 10 minutes and 6 months out, and `page_scheduled_posts` plus
+`page_cancel_scheduled_post` are how you see and undo it afterwards. Instagram
+publishing is the two-step container flow, with the server waiting for Meta to
+finish processing.
 
 Meta ids do not say which Page they belong to. For tools taking a `post_id`,
 `comment_id` or `media_id`, the Page is resolved in that order: the `page_id` you
 passed, the `{page_id}_...` prefix Facebook uses, then the only connected Page. If
 several Pages are connected and nothing settles it, the tool asks for `page_id`
 rather than guessing across accounts.
+
+### Resources and prompts
+
+Two resources expose the same data as tools, for clients that prefer to attach
+context rather than call: `metasocial://pages` and `metasocial://connection`. Both
+are tenant-scoped like everything else, so the same URI gives each user their own
+data.
+
+Two prompts drive the common workflows: `bilan_mensuel` builds a monthly organic
+report for a Page and its Instagram account, and `revue_commentaires` walks through
+recent comments, proposing replies and flagging what deserves moderation. The
+reporting prompt forbids any write; the moderation one never suggests deleting on
+its own, since hiding is reversible and deleting is not.
+
+## The connection renews itself
+
+A Meta user token lasts about 60 days. The server records when each one expires and
+renews it twice a day for anyone inside a two week window, which is why a tenant who
+keeps using the server never has to log in again. A token Meta refuses to renew, a
+revoked app for instance, is reported in the logs and left alone: nothing is deleted
+on the user's behalf, and `connection_status` tells them what happened with a link to
+fix it.
 
 ## Nothing gets published without a human
 

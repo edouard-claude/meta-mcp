@@ -101,7 +101,7 @@ func run() error {
 		AppSecret:   cfg.MetaAppSecret,
 	}, logger)
 
-	svc := app.NewService(store, graph, clock.System{}, cfg.PublicURL)
+	svc := app.NewService(store, graph, clock.System{}, cfg.PublicURL, cfg.ScopeList())
 	mcpHandler := mcpserver.Handler(
 		mcpserver.New(svc, logger),
 		func(token string) (string, time.Time, error) {

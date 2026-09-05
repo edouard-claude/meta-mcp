@@ -40,8 +40,12 @@ func New(svc *app.Service, logger *slog.Logger) *mcp.Server {
 		Instructions: instructions,
 	})
 
+	d.registerResources(srv)
+	d.registerPrompts(srv)
 	d.registerReadTools(srv)
+	d.registerDetailTools(srv)
 	d.registerWriteTools(srv)
+	d.registerModerationTools(srv)
 	return srv
 }
 
@@ -70,10 +74,15 @@ l'adresse obtenue à l'utilisateur.`
 // handler, so this failing means a wiring bug.
 func tenantID(req *mcp.CallToolRequest) (string, error) {
 	if req == nil || req.Extra.TokenInfo == nil || req.Extra.TokenInfo.UserID == "" {
-		return "", errors.New("session non authentifiée")
+		return "", errSessionUnauthenticated
 	}
 	return req.Extra.TokenInfo.UserID, nil
 }
+
+// errSessionUnauthenticated means a request reached a handler without a
+// verified tenant, which can only be a wiring bug: the middleware rejects
+// unauthenticated requests before they get this far.
+var errSessionUnauthenticated = errors.New("session non authentifiée")
 
 // jsonResult packs a value as the single compact JSON text block every tool
 // returns.
@@ -112,6 +121,18 @@ func writing() *mcp.ToolAnnotations {
 	return &mcp.ToolAnnotations{
 		ReadOnlyHint:    false,
 		DestructiveHint: ptr(false),
+		IdempotentHint:  false,
+		OpenWorldHint:   ptr(true),
+	}
+}
+
+// moderating annotates a tool that can hide or destroy existing content. The
+// destructive hint is what tells a client to treat it with more care than a
+// publication.
+func moderating() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{
+		ReadOnlyHint:    false,
+		DestructiveHint: ptr(true),
 		IdempotentHint:  false,
 		OpenWorldHint:   ptr(true),
 	}

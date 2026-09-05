@@ -109,11 +109,17 @@ type GraphClient interface {
 	PageInsights(ctx context.Context, pageToken, pageID string, metrics []string, since, until time.Time) (InsightSet, error)
 	PagePosts(ctx context.Context, pageToken, pageID string, since time.Time, limit int) ([]Post, error)
 	PostComments(ctx context.Context, pageToken, postID string, limit int) ([]Comment, error)
+	PostInsights(ctx context.Context, pageToken, postID string, metrics []string) (InsightSet, error)
+	ScheduledPosts(ctx context.Context, pageToken, pageID string, limit int) ([]ScheduledPost, error)
 
 	// --- Facebook Page, write ---
 
 	PublishPost(ctx context.Context, pageToken, pageID string, req PublishPostRequest) (string, error)
 	ReplyToComment(ctx context.Context, pageToken, commentID, message string) (string, error)
+	// SetCommentHidden hides or unhides a comment. Facebook and Instagram
+	// spell the parameter differently, which implementations absorb.
+	SetCommentHidden(ctx context.Context, pageToken, commentID string, hidden, instagram bool) error
+	DeleteObject(ctx context.Context, pageToken, objectID string) error
 
 	// --- Instagram, read ---
 
@@ -121,6 +127,10 @@ type GraphClient interface {
 	IGFollowerDemographics(ctx context.Context, pageToken, igUserID, breakdown string) ([]Breakdown, error)
 	IGMedia(ctx context.Context, pageToken, igUserID string, since time.Time, limit int) ([]Media, error)
 	IGMediaComments(ctx context.Context, pageToken, mediaID string, limit int) ([]Comment, error)
+	IGMediaInsights(ctx context.Context, pageToken, mediaID string, metrics []string) (InsightSet, error)
+	// IGStories lists the stories still live on the account; Meta drops them
+	// from this edge once they are 24 hours old.
+	IGStories(ctx context.Context, pageToken, igUserID string) ([]Media, error)
 
 	// --- Instagram, write ---
 

@@ -117,6 +117,15 @@ func (c *Client) createIGContainer(ctx context.Context, pageToken, igUserID stri
 	}
 
 	switch req.MediaType {
+	case domain.IGMediaTypeStories:
+		params.Set("media_type", domain.IGMediaTypeStories)
+		// A story is either an image or a video, and carries no caption.
+		params.Del("caption")
+		if req.VideoURL != "" {
+			params.Set("video_url", req.VideoURL)
+		} else {
+			params.Set("image_url", req.ImageURL)
+		}
 	case domain.IGMediaTypeReels:
 		params.Set("media_type", domain.IGMediaTypeReels)
 		params.Set("video_url", req.VideoURL)

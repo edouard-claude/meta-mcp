@@ -238,3 +238,132 @@ func TestIGPublishSurfacesContainerError(t *testing.T) {
 		t.Fatalf("erreur = %v", err)
 	}
 }
+
+func TestScheduledPostsNormalizesTheDate(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /page-1/scheduled_posts", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Meta returns the date as a unix timestamp on this edge.
+		_, _ = w.Write([]byte(`{"data":[
+			{"id":"page-1_1","message":"Bientôt","created_time":"2026-09-01T10:00:00+0000","scheduled_publish_time":1789030800},
+			{"id":"page-1_2","message":"Plus tard","scheduled_publish_time":"2026-09-12T09:00:00+0000"}
+		]}`))
+	})
+
+	posts, err := g.newTestClient().ScheduledPosts(t.Context(), "PT", "page-1", 25)
+	if err != nil {
+		t.Fatalf("ScheduledPosts: %v", err)
+	}
+	if len(posts) != 2 {
+		t.Fatalf("%d publications", len(posts))
+	}
+	if posts[0].PostID != "page-1_1" || posts[0].Message != "Bientôt" {
+		t.Fatalf("publication = %+v", posts[0])
+	}
+	if !strings.HasPrefix(posts[0].ScheduledAt, "2026-") {
+		t.Fatalf("date normalisée = %q", posts[0].ScheduledAt)
+	}
+	if posts[1].ScheduledAt != "2026-09-12T09:00:00+0000" {
+		t.Fatalf("date ISO non conservée: %q", posts[1].ScheduledAt)
+	}
+}
+
+func TestSetCommentHiddenUsesThePlatformParameter(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("POST /c-1", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	})
+	c := g.newTestClient()
+
+	if err := c.SetCommentHidden(t.Context(), "PT", "c-1", true, false); err != nil {
+		t.Fatalf("SetCommentHidden facebook: %v", err)
+	}
+	if got := g.calls("/c-1")[0].Form.Get("is_hidden"); got != "true" {
+		t.Fatalf("Facebook attend is_hidden, reçu %v", g.calls("/c-1")[0].Form)
+	}
+
+	if err := c.SetCommentHidden(t.Context(), "PT", "c-1", true, true); err != nil {
+		t.Fatalf("SetCommentHidden instagram: %v", err)
+	}
+	form := g.calls("/c-1")[1].Form
+	if form.Get("hide") != "true" || form.Get("is_hidden") != "" {
+		t.Fatalf("Instagram attend hide, reçu %v", form)
+	}
+}
+
+func TestDeleteObjectUsesTheMethodOverride(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("POST /c-9", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	})
+
+	if err := g.newTestClient().DeleteObject(t.Context(), "PT", "c-9"); err != nil {
+		t.Fatalf("DeleteObject: %v", err)
+	}
+	if got := g.calls("/c-9")[0].Form.Get("method"); got != "delete" {
+		t.Fatalf("method = %q", got)
+	}
+}
+
+func TestDeleteObjectSurfacesGraphErrors(t *testing.T) {
+	g := newFakeGraph(t)
+	g.fail("POST /c-9", "error_190.json", http.StatusBadRequest, nil)
+
+	err := g.newTestClient().DeleteObject(t.Context(), "PT", "c-9")
+	if err == nil {
+		t.Fatal("aucune erreur")
+	}
+	if ge, ok := domain.AsGraphError(err); !ok || !ge.IsAuth() {
+		t.Fatalf("erreur = %v", err)
+	}
+}
+
+func TestIGStoriesAsksForNarrowFields(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("GET /ig-1/stories", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"s-1","media_type":"IMAGE","media_product_type":"STORY","timestamp":"2026-09-05T08:00:00+0000","permalink":"https://instagram.test/s/1"}]}`))
+	})
+
+	stories, err := g.newTestClient().IGStories(t.Context(), "PT", "ig-1")
+	if err != nil {
+		t.Fatalf("IGStories: %v", err)
+	}
+	if len(stories) != 1 || stories[0].MediaID != "s-1" || stories[0].ProductType != "STORY" {
+		t.Fatalf("stories = %+v", stories)
+	}
+	// like_count and comments_count do not exist on a story, and asking for
+	// them would fail the whole request.
+	fields := g.calls("/ig-1/stories")[0].Query.Get("fields")
+	if strings.Contains(fields, "like_count") || strings.Contains(fields, "insights") {
+		t.Fatalf("champs demandés = %q", fields)
+	}
+}
+
+func TestIGPublishStory(t *testing.T) {
+	g := newFakeGraph(t)
+	g.handle("POST /ig-1/media", writeOK("container-s"))
+	g.handle("GET /container-s", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status_code":"FINISHED"}`))
+	})
+	g.handle("POST /ig-1/media_publish", writeOK("story-42"))
+
+	id, err := g.newTestClient().IGPublish(t.Context(), "PT", "ig-1", domain.IGPublishRequest{
+		MediaType: domain.IGMediaTypeStories, ImageURL: "https://cdn.test/s.jpg",
+	})
+	if err != nil {
+		t.Fatalf("IGPublish: %v", err)
+	}
+	if id != "story-42" {
+		t.Fatalf("id = %q", id)
+	}
+	form := g.calls("/ig-1/media")[0].Form
+	if form.Get("media_type") != "STORIES" || form.Get("image_url") != "https://cdn.test/s.jpg" {
+		t.Fatalf("formulaire = %v", form)
+	}
+	if form.Get("caption") != "" {
+		t.Fatalf("une story ne porte pas de légende: %v", form)
+	}
+}
