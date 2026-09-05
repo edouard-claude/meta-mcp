@@ -15,19 +15,11 @@ var files embed.FS
 
 // Page names, matching the template files.
 const (
-	PageLogin       = "login.html"
 	PageError       = "error.html"
 	PageDeauthorize = "deauthorize.html"
 	PagePrivacy     = "privacy.html"
 	PageReconnected = "reconnected.html"
 )
-
-// LoginData fills the "connect your Facebook account" page.
-type LoginData struct {
-	Title        string
-	AuthorizeURL template.URL
-	PrivacyURL   string
-}
 
 // ErrorData fills the error page. Detail is optional.
 type ErrorData struct {
@@ -59,7 +51,7 @@ type PrivacyData struct {
 // all into one template set.
 var pages = func() map[string]*template.Template {
 	out := map[string]*template.Template{}
-	for _, name := range []string{PageLogin, PageError, PageDeauthorize, PagePrivacy, PageReconnected} {
+	for _, name := range []string{PageError, PageDeauthorize, PagePrivacy, PageReconnected} {
 		out[name] = template.Must(template.ParseFS(files, "layout.html", name))
 	}
 	return out

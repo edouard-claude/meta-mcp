@@ -136,23 +136,29 @@ func serve(h http.Handler, req *http.Request) *httptest.ResponseRecorder {
 	return rec
 }
 
-func TestLoginPageShowsFacebookButton(t *testing.T) {
+func TestLoginRedirectsStraightToFacebook(t *testing.T) {
 	h := newHandlerHarness(t, nil)
 	rec := serve(h.handlers.LoginHandler(),
 		httptest.NewRequest(http.MethodGet, "/meta/login?state=abc", nil))
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d", rec.Code)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status %d, attendu 302: la page intermédiaire ne doit plus exister", rec.Code)
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "Continuer avec Facebook") {
-		t.Fatalf("bouton absent: %s", body)
+	loc, err := url.Parse(rec.Header().Get("Location"))
+	if err != nil {
+		t.Fatalf("Location: %v", err)
 	}
-	if !strings.Contains(body, "facebook.test") || !strings.Contains(body, "state=abc") {
-		t.Fatalf("lien de dialogue absent: %s", body)
+	if loc.Host != "facebook.test" {
+		t.Fatalf("redirection vers %s", loc)
 	}
-	if !strings.Contains(body, testPublicURL+"/privacy") {
-		t.Fatal("lien vers la politique de confidentialité absent")
+	if loc.Query().Get("state") != "abc" {
+		t.Fatalf("state non transmis: %s", loc)
+	}
+	if loc.Query().Get("redirect_uri") != testCallbackURI {
+		t.Fatalf("redirect_uri = %q", loc.Query().Get("redirect_uri"))
+	}
+	if rec.Body.Len() != 0 && !strings.Contains(rec.Body.String(), "Found") {
+		t.Fatalf("corps inattendu: %s", rec.Body.String())
 	}
 }
 
@@ -161,6 +167,9 @@ func TestLoginPageRequiresState(t *testing.T) {
 	rec := serve(h.handlers.LoginHandler(), httptest.NewRequest(http.MethodGet, "/meta/login", nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status %d, attendu 400", rec.Code)
+	}
+	if rec.Header().Get("Location") != "" {
+		t.Fatal("une redirection a été émise sans state")
 	}
 }
 

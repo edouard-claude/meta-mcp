@@ -284,8 +284,8 @@ authorization server in the `WWW-Authenticate` header of the 401, so a client th
 implements the MCP authorization spec needs nothing else.
 </details>
 
-A page opens: **Continue with Facebook**, pick the Pages to share, accept the
-permissions. The browser returns to the client, which gets its token. Done.
+The browser goes straight to the Facebook dialog: pick the Pages to share, accept
+the permissions, and it returns to the client, which gets its token. Done.
 
 Ask *"list my pages"*: `list_pages` should answer with the Pages of that account.
 

@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -49,21 +48,24 @@ func NewHandlers(login *app.LoginService, issuer CodeIssuer, opts HandlerOptions
 	return &Handlers{login: login, issuer: issuer, opts: opts, logger: logger}
 }
 
-// LoginHandler serves GET /meta/login?state=… : the page with the "continue
-// with Facebook" button. The state is the one parked by /oauth/authorize.
+// LoginHandler serves GET /meta/login?state=… by sending the browser straight
+// to the Facebook dialog.
+//
+// There used to be an interstitial page with a "continue with Facebook"
+// button here. It is gone on purpose: it cost every user a click to read a
+// consent summary that the Facebook dialog states again, in more detail and
+// with more authority. The route itself stays, because it is the stable entry
+// point /oauth/authorize and reconnect_url both point at, and it is what maps
+// a state to a dialog server-side.
 func (h *Handlers) LoginHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		state := r.URL.Query().Get("state")
 		if state == "" {
 			h.renderError(w, http.StatusBadRequest, "Lien incomplet",
-				"Cette page doit être ouverte depuis votre client MCP.", "")
+				"Cette adresse doit être ouverte depuis votre client MCP.", "")
 			return
 		}
-		h.render(w, http.StatusOK, web.PageLogin, web.LoginData{
-			Title:        "Connecter votre compte Facebook",
-			AuthorizeURL: template.URL(h.login.AuthorizeURL(h.opts.RedirectURI, state)),
-			PrivacyURL:   h.opts.PublicURL + "/privacy",
-		})
+		http.Redirect(w, r, h.login.AuthorizeURL(h.opts.RedirectURI, state), http.StatusFound)
 	})
 }
 
