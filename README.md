@@ -338,8 +338,9 @@ maintained catalogue in the code, not a live capability check: the
 | `page_moderate_comment` | Hides, unhides or deletes a comment on a Page post |
 | `ig_moderate_comment` | Same on an Instagram media |
 | `page_cancel_scheduled_post` | Deletes a post Meta had not published yet |
+| `page_delete_post` | Deletes a published post, with its reactions and comments |
 
-The last three are annotated as destructive, so a client can warn before running
+The last four are annotated as destructive, so a client can warn before running
 them, and their preview says plainly what cannot be undone.
 
 Scheduling goes through Meta's own `scheduled_publish_time`: `scheduled_at` is an

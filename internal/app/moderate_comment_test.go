@@ -214,3 +214,39 @@ func TestIGPublishAcceptsStories(t *testing.T) {
 		})
 	}
 }
+
+func TestDeletePost(t *testing.T) {
+	svc, _, graph, _ := newServiceHarness(t)
+
+	out, err := svc.PageDeletePost(t.Context(), "tenant-a", DeletePostInput{PostID: "page-a_1"})
+	if err != nil {
+		t.Fatalf("PageDeletePost: %v", err)
+	}
+	if !out.Preview || out.Deleted {
+		t.Fatalf("aperçu = %+v", out)
+	}
+	if !strings.Contains(out.Notice, "définitive") || !strings.Contains(out.Notice, "commentaires") {
+		t.Fatalf("l'aperçu ne dit pas ce qui disparaît: %q", out.Notice)
+	}
+	if len(graph.calls) != 0 {
+		t.Fatalf("appel Graph sans confirmation: %+v", graph.calls)
+	}
+
+	out, err = svc.PageDeletePost(t.Context(), "tenant-a",
+		DeletePostInput{PostID: "page-a_1", Confirm: true})
+	if err != nil {
+		t.Fatalf("PageDeletePost: %v", err)
+	}
+	if !out.Deleted || graph.last().Method != "DeleteObject" || graph.last().Token != "PT-A" {
+		t.Fatalf("résultat = %+v, appel = %+v", out, graph.last())
+	}
+
+	if _, err := svc.PageDeletePost(t.Context(), "tenant-a", DeletePostInput{PostID: " "}); err == nil {
+		t.Fatal("un post_id vide a été accepté")
+	}
+	// And a post on another tenant's page stays out of reach.
+	if _, err := svc.PageDeletePost(t.Context(), "tenant-a",
+		DeletePostInput{PostID: "x", PageID: "page-b", Confirm: true}); !errors.Is(err, domain.ErrUnknownPage) {
+		t.Fatalf("erreur = %v", err)
+	}
+}

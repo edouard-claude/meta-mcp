@@ -186,6 +186,13 @@ func (d *deps) registerModerationTools(srv *mcp.Server) {
 	}, d.toolIGModerateComment)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "page_delete_post",
+		Title:       "Supprimer une publication",
+		Description: "Supprime définitivement une publication déjà en ligne sur une Page. La publication, ses réactions et ses commentaires disparaissent, et rien ne les restaure. Pour une publication encore programmée, utilisez plutôt page_cancel_scheduled_post." + confirmDoc,
+		Annotations: moderating(),
+	}, d.toolPageDeletePost)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "page_cancel_scheduled_post",
 		Title:       "Annuler une publication programmée",
 		Description: "Supprime une publication que Meta gardait en attente. L'annulation est définitive : la publication est supprimée, pas mise en pause. Utilisez page_scheduled_posts pour obtenir post_id." + confirmDoc,
@@ -265,6 +272,32 @@ func (d *deps) toolPageCancelScheduledPost(ctx context.Context, req *mcp.CallToo
 	}
 	if !out.Preview {
 		d.logger.Info("publication programmée annulée", "page_id", out.PageID)
+	}
+	return jsonResult(out)
+}
+
+// DeletePostArgs are the arguments of page_delete_post.
+type DeletePostArgs struct {
+	PostID  string `json:"post_id" jsonschema:"Identifiant de la publication à supprimer, tel que renvoyé par page_posts."`
+	PageID  string `json:"page_id,omitempty" jsonschema:"Page concernée. Facultatif : déduit de post_id, ou de la seule page connectée."`
+	Confirm bool   `json:"confirm,omitempty" jsonschema:"Doit valoir true pour supprimer réellement. false ou absent renvoie un aperçu."`
+}
+
+func (d *deps) toolPageDeletePost(ctx context.Context, req *mcp.CallToolRequest, args DeletePostArgs) (*mcp.CallToolResult, any, error) {
+	tenant, err := tenantID(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := d.svc.PageDeletePost(ctx, tenant, app.DeletePostInput{
+		PostID:  args.PostID,
+		PageID:  args.PageID,
+		Confirm: args.Confirm,
+	})
+	if err != nil {
+		return nil, nil, d.toolError("page_delete_post", err)
+	}
+	if !out.Preview {
+		d.logger.Info("publication supprimée", "page_id", out.PageID, "post_id", out.PostID)
 	}
 	return jsonResult(out)
 }

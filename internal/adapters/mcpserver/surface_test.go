@@ -20,6 +20,7 @@ var allTools = []string{
 	"page_publish_post", "page_reply_comment", "ig_publish", "ig_reply_comment",
 	// moderation
 	"page_moderate_comment", "ig_moderate_comment", "page_cancel_scheduled_post",
+	"page_delete_post",
 }
 
 func TestEveryToolIsRegistered(t *testing.T) {
@@ -49,7 +50,8 @@ func TestEveryToolIsRegistered(t *testing.T) {
 
 	// The tools that destroy content must say so through their annotations,
 	// which is what lets a client warn before running them.
-	for _, name := range []string{"page_moderate_comment", "ig_moderate_comment", "page_cancel_scheduled_post"} {
+	for _, name := range []string{"page_moderate_comment", "ig_moderate_comment",
+		"page_cancel_scheduled_post", "page_delete_post"} {
 		tool := got[name]
 		if tool == nil || tool.Annotations == nil || tool.Annotations.DestructiveHint == nil ||
 			!*tool.Annotations.DestructiveHint {
@@ -66,6 +68,7 @@ func TestModerationToolsNeedConfirmation(t *testing.T) {
 		{"page_moderate_comment", map[string]any{"comment_id": "page-a_1", "action": "hide"}},
 		{"ig_moderate_comment", map[string]any{"comment_id": "igc1", "page_id": "page-a", "action": "delete"}},
 		{"page_cancel_scheduled_post", map[string]any{"post_id": "page-a_prog"}},
+		{"page_delete_post", map[string]any{"post_id": "page-a_1"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.tool, func(t *testing.T) {
