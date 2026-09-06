@@ -34,6 +34,10 @@ type Handlers struct {
 
 	MCP http.Handler
 
+	// LoopbackRelay forwards an OAuth callback to a client listening on the
+	// user's own machine, which Meta refuses to name as a redirect target.
+	LoopbackRelay http.Handler
+
 	// Health reports whether the process can serve traffic. A non-nil error
 	// turns GET /healthz into a 503.
 	Health func(ctx context.Context) error
@@ -62,6 +66,7 @@ func New(h Handlers, logger *slog.Logger) http.Handler {
 	mount(mux, "POST /meta/data-deletion", h.MetaDataDeletion)
 	mount(mux, "GET /meta/deauthorize", h.MetaDeauthorize)
 	mount(mux, "GET /privacy", h.Privacy)
+	mount(mux, "GET /relay/callback", h.LoopbackRelay)
 
 	if h.MCP != nil {
 		// The MCP transport needs POST, GET and DELETE on the same path.

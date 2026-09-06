@@ -161,3 +161,52 @@ type flushRecorder struct {
 }
 
 func (f *flushRecorder) Flush() { f.onFlush() }
+
+func TestLoopbackRelayForwardsToTheFixedLocalPort(t *testing.T) {
+	router := newRouter(t, Handlers{
+		LoopbackRelay: LoopbackRelayHandler(
+			RelayOptions{Port: 8787, Path: "/callback"}, slog.New(slog.DiscardHandler)),
+	})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+		"/relay/callback?code=abc&state=xyz", nil))
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status %d, attendu 302", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if loc != "http://127.0.0.1:8787/callback?code=abc&state=xyz" {
+		t.Fatalf("redirection = %q", loc)
+	}
+}
+
+// TestLoopbackRelayIsNotAnOpenRedirector pins the property that makes this
+// route safe: the destination host and port come from the configuration, so
+// nothing in the request can steer it elsewhere.
+func TestLoopbackRelayIsNotAnOpenRedirector(t *testing.T) {
+	router := newRouter(t, Handlers{
+		LoopbackRelay: LoopbackRelayHandler(
+			RelayOptions{Port: 8787, Path: "/callback"}, slog.New(slog.DiscardHandler)),
+	})
+	for _, q := range []string{
+		"?redirect_uri=https://evil.example/steal&code=abc",
+		"?host=evil.example",
+		"?code=abc#@evil.example",
+	} {
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/relay/callback"+q, nil))
+		loc := rec.Header().Get("Location")
+		if !strings.HasPrefix(loc, "http://127.0.0.1:8787/callback?") {
+			t.Fatalf("%s -> %q", q, loc)
+		}
+	}
+}
+
+func TestLoopbackRelayIsAbsentWithoutAPort(t *testing.T) {
+	router := newRouter(t, Handlers{})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/relay/callback", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status %d, attendu 404", rec.Code)
+	}
+}

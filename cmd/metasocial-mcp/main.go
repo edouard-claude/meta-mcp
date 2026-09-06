@@ -127,6 +127,7 @@ func run() error {
 		MetaDeauthorize:           metaHandlers.DeauthorizeHandler(),
 		Privacy:                   metaHandlers.PrivacyHandler(),
 		MCP:                       mcpHandler,
+		LoopbackRelay:             relayHandler(cfg, logger),
 		Health:                    store.Ping,
 	}, logger)
 
@@ -174,6 +175,15 @@ func purgeLoop(ctx context.Context, store *sqlite.Store, logger *slog.Logger) {
 			}
 		}
 	}
+}
+
+// relayHandler builds the loopback OAuth relay, or nil when no port is set.
+func relayHandler(cfg *config.Config, logger *slog.Logger) http.Handler {
+	if cfg.RelayPort == 0 {
+		return nil
+	}
+	return httpserver.LoopbackRelayHandler(
+		httpserver.RelayOptions{Port: cfg.RelayPort, Path: "/callback"}, logger)
 }
 
 // refreshLoop renews the Meta user tokens that are about to expire, at

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +32,9 @@ const (
 	// EnvGraphBaseURL and EnvDialogBaseURL point the Graph client somewhere
 	// else than Meta. They exist for the end to end test, which runs the
 	// real binary against a fake Graph, and are not meant for production.
+	// EnvRelayPort enables the loopback OAuth relay on /relay/callback.
+	EnvRelayPort = "LOOPBACK_RELAY_PORT"
+
 	EnvGraphBaseURL  = "META_GRAPH_BASE_URL"
 	EnvDialogBaseURL = "META_DIALOG_BASE_URL"
 )
@@ -76,6 +80,10 @@ type Config struct {
 	// www.facebook.com.
 	GraphBaseURL  string
 	DialogBaseURL string
+
+	// RelayPort, when non-zero, exposes /relay/callback which forwards an
+	// OAuth callback to 127.0.0.1 on that port.
+	RelayPort int
 
 	// AllowedMetaUserIDs, when non-empty, is the whitelist of Facebook user
 	// ids allowed to create a tenant.
@@ -148,6 +156,14 @@ func Load() (*Config, error) {
 	}
 	if cfg.JWTSigningKey, err = decodeKey(EnvJWTSigningKey, minSigningKeyLen, false); err != nil {
 		return nil, err
+	}
+
+	if raw := strings.TrimSpace(os.Getenv(EnvRelayPort)); raw != "" {
+		port, convErr := strconv.Atoi(raw)
+		if convErr != nil || port < 1 || port > 65535 {
+			return nil, fmt.Errorf("%s doit être un port entre 1 et 65535", EnvRelayPort)
+		}
+		cfg.RelayPort = port
 	}
 
 	if cfg.AccessTokenTTL, err = parseDuration(EnvAccessTokenTTL, defaultAccessTokenTTL); err != nil {
