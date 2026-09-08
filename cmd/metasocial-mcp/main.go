@@ -26,6 +26,7 @@ import (
 	"github.com/edouard-claude/meta-mcp/internal/adapters/sqlite"
 	"github.com/edouard-claude/meta-mcp/internal/app"
 	"github.com/edouard-claude/meta-mcp/internal/config"
+	"github.com/edouard-claude/meta-mcp/web"
 )
 
 const (
@@ -125,6 +126,7 @@ func run() error {
 		MetaCallback:              metaHandlers.CallbackHandler(),
 		MetaDataDeletion:          metaHandlers.DataDeletionHandler(),
 		MetaDeauthorize:           metaHandlers.DeauthorizeHandler(),
+		Icon:                      web.IconHandler(),
 		Privacy:                   metaHandlers.PrivacyHandler(),
 		MCP:                       mcpHandler,
 		LoopbackRelay:             relayHandler(cfg, logger),

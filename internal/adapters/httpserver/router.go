@@ -31,6 +31,8 @@ type Handlers struct {
 	MetaDataDeletion http.Handler
 	MetaDeauthorize  http.Handler
 	Privacy          http.Handler
+	// Icon serves the server's own icon, the one advertised over MCP.
+	Icon http.Handler
 
 	MCP http.Handler
 
@@ -66,6 +68,7 @@ func New(h Handlers, logger *slog.Logger) http.Handler {
 	mount(mux, "POST /meta/data-deletion", h.MetaDataDeletion)
 	mount(mux, "GET /meta/deauthorize", h.MetaDeauthorize)
 	mount(mux, "GET /privacy", h.Privacy)
+	mount(mux, "GET /icon.png", h.Icon)
 	mount(mux, "GET /relay/callback", h.LoopbackRelay)
 
 	if h.MCP != nil {

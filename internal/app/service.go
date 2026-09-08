@@ -250,3 +250,7 @@ func syncPages(ctx context.Context, store domain.TenantStore, meta domain.MetaOA
 	}
 	return pages, nil
 }
+
+// PublicURL is this server's base URL. The MCP layer needs it to advertise
+// absolute links, an icon among them.
+func (s *Service) PublicURL() string { return s.publicURL }

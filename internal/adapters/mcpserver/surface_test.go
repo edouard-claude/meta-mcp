@@ -203,3 +203,26 @@ func TestPromptsAreOffered(t *testing.T) {
 		t.Fatalf("prompt = %s", text.Text)
 	}
 }
+
+// TestServerAdvertisesItsIdentity pins what a client needs to show this server
+// as itself: a title, a website and an icon, all absolute so they resolve from
+// anywhere.
+func TestServerAdvertisesItsIdentity(t *testing.T) {
+	h := newServerHarness(t)
+	session := h.connect(t, "token-a")
+
+	info := session.InitializeResult().ServerInfo
+	if info.Title == "" || info.Version == "" {
+		t.Fatalf("identité incomplète: %+v", info)
+	}
+	if info.WebsiteURL != "https://mcp.example.re" {
+		t.Fatalf("site = %q", info.WebsiteURL)
+	}
+	if len(info.Icons) != 1 {
+		t.Fatalf("icônes = %+v", info.Icons)
+	}
+	icon := info.Icons[0]
+	if icon.Source != "https://mcp.example.re/icon.png" || icon.MIMEType != "image/png" {
+		t.Fatalf("icône = %+v", icon)
+	}
+}
