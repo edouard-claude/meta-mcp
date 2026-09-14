@@ -1,0 +1,48 @@
+# Déploiement continu sur CapRover.
+#
+# Chaque push sur main passe d'abord le job « tests » (make check), puis
+# envoie une archive tar du commit testé à CapRover, qui construit l'image
+# d'après le captain-definition et met à jour le service. Les pull requests
+# sont validées sans rien déployer.
+#
+# Secret attendu : CAPROVER_APP_TOKEN (onglet Deployment de l'app meta-mcp).
+name: Déploiement
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make check
+
+  deploy:
+    needs: tests
+    if: github.event_name == 'push' && github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    # Sérialise les déploiements sans jamais interrompre celui en cours :
+    # l'annuler laisserait le service Swarm à moitié mis à jour.
+    concurrency:
+      group: deploiement-${{ github.ref }}
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://meta-mcp.cr.edouard.cl
+    steps:
+      - uses: actions/checkout@v4
+      # Sans « branch » ni « image », l'action attend ./deploy.tar : on
+      # l'assemble depuis HEAD pour déployer exactement le commit testé.
+      - run: git archive --format=tar -o ./deploy.tar HEAD
+      # Épinglée au SHA (v1.2.0) : cette action reçoit le jeton de déploiement.
+      - uses: caprover/deploy-from-github@c221bd9d1c3a55de4c2b66c0dc4a3972d04c027c
+        with:
+          server: https://captain.cr.edouard.cl
+          app: meta-mcp
+          token: ${{ secrets.CAPROVER_APP_TOKEN }}

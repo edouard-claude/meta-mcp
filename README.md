@@ -188,7 +188,11 @@ The repository ships the `Dockerfile` (multi-stage, `golang:1.26-alpine` to
    `sudo docker run --rm -v <volume>:/data busybox chown -R 65532:65532 /data`.
 3. *HTTP Settings*: enable HTTPS and **Force HTTPS**. The binary only speaks plain
    HTTP internally; CapRover terminates TLS.
-4. *Deployment*: **Enable App Token**, keep the token.
+4. *Deployment*: **Enable App Token**, store it as the `CAPROVER_APP_TOKEN` secret of
+   the GitHub repository. From then on every push to `main` that passes `make check`
+   is deployed by `.github/workflows/deploy.yml`; pull requests are only tested.
+
+To deploy by hand instead:
 
 ```bash
 git archive --format=tar -o app.tar HEAD
