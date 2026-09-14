@@ -51,6 +51,34 @@ type Post struct {
 	VideoViews  int64  `json:"video_views,omitempty"`
 }
 
+// PageRatings is what page_ratings returns: the public rating summary of a
+// Facebook Page and the recommendations Meta serves for it.
+type PageRatings struct {
+	PageID string `json:"page_id"`
+	// OverallStarRating is Meta's 1 to 5 average. Zero means Meta withheld
+	// it, which it does below a minimum number of ratings.
+	OverallStarRating float64 `json:"overall_star_rating"`
+	// RatingCount only counts publicly accessible ratings, so it can be zero
+	// while recommendations are listed below.
+	RatingCount     int64            `json:"rating_count"`
+	Recommendations []Recommendation `json:"recommendations"`
+	// RecommendationsUnavailable explains an empty list when Meta refused
+	// the /ratings edge rather than serving it empty.
+	RecommendationsUnavailable string `json:"recommendations_unavailable,omitempty"`
+}
+
+// Recommendation is one review left on a Page. Since 2018 Facebook collects
+// a positive or negative recommendation with optional text; the 1 to 5 star
+// Rating only exists on reviews older than that. Reviewer is filled only when
+// the author let the app see their name, so it is usually empty.
+type Recommendation struct {
+	CreatedTime string `json:"created_time"`
+	Type        string `json:"recommendation_type,omitempty"`
+	Rating      int    `json:"rating,omitempty"`
+	ReviewText  string `json:"review_text,omitempty"`
+	Reviewer    string `json:"reviewer,omitempty"`
+}
+
 // Comment is a comment on a Page post or on an Instagram media.
 type Comment struct {
 	CommentID   string `json:"comment_id"`

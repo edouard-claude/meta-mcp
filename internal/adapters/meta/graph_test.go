@@ -427,3 +427,71 @@ func TestDemographicsDoNotFollowPaginationEither(t *testing.T) {
 		t.Fatalf("%d entrées en %d appels", len(breakdowns), calls)
 	}
 }
+
+func TestPageRatings(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1", "page_ratings_summary.json", "")
+	g.json("GET /page-1/ratings", "page_ratings.json", "")
+
+	got, err := g.newTestClient().PageRatings(t.Context(), "PT", "page-1", 10)
+	if err != nil {
+		t.Fatalf("PageRatings: %v", err)
+	}
+	if got.PageID != "page-1" || got.OverallStarRating != 3.7 || got.RatingCount != 0 {
+		t.Fatalf("résumé = %+v", got)
+	}
+	if got.RecommendationsUnavailable != "" {
+		t.Fatalf("liste signalée indisponible à tort: %s", got.RecommendationsUnavailable)
+	}
+	if len(got.Recommendations) != 3 {
+		t.Fatalf("%d avis", len(got.Recommendations))
+	}
+	first := got.Recommendations[0]
+	if first.Type != "negative" || first.Rating != 0 || first.Reviewer != "" ||
+		!strings.HasPrefix(first.ReviewText, "Pas d'eau chaude") ||
+		first.CreatedTime != "2026-06-08T13:08:35+0000" {
+		t.Fatalf("avis = %+v", first)
+	}
+	// A pre-2018 review carries stars and, when the author allows it, a name.
+	if old := got.Recommendations[2]; old.Rating != 5 || old.Reviewer != "Alice" || old.Type != "" {
+		t.Fatalf("ancien avis = %+v", old)
+	}
+
+	if q := g.calls("/page-1")[0].Query; q.Get("fields") != pageRatingFields {
+		t.Fatalf("champs du résumé = %q", q.Get("fields"))
+	}
+	q := g.calls("/page-1/ratings")[0].Query
+	if q.Get("limit") != "10" || q.Get("fields") != ratingFields {
+		t.Fatalf("paramètres = %v", q)
+	}
+}
+
+// TestPageRatingsKeepsTheSummaryWhenMetaRetiresTheEdge pins the day Meta
+// enforces the v22.0 deprecation: the average must survive the refused list.
+func TestPageRatingsKeepsTheSummaryWhenMetaRetiresTheEdge(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1", "page_ratings_summary.json", "")
+	g.fail("GET /page-1/ratings", "error_12.json", http.StatusBadRequest, nil)
+
+	got, err := g.newTestClient().PageRatings(t.Context(), "PT", "page-1", 10)
+	if err != nil {
+		t.Fatalf("PageRatings: %v", err)
+	}
+	if got.OverallStarRating != 3.7 || len(got.Recommendations) != 0 || got.RecommendationsUnavailable == "" {
+		t.Fatalf("résultat = %+v", got)
+	}
+}
+
+// TestPageRatingsDoesNotSwallowAuthErrors makes sure only the deprecation is
+// tolerated, never an expired token.
+func TestPageRatingsDoesNotSwallowAuthErrors(t *testing.T) {
+	g := newFakeGraph(t)
+	g.json("GET /page-1", "page_ratings_summary.json", "")
+	g.fail("GET /page-1/ratings", "error_190.json", http.StatusBadRequest, nil)
+
+	_, err := g.newTestClient().PageRatings(t.Context(), "PT", "page-1", 10)
+	ge, ok := domain.AsGraphError(err)
+	if !ok || !ge.IsAuth() {
+		t.Fatalf("erreur = %v", err)
+	}
+}

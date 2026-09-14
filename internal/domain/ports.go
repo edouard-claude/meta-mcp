@@ -116,6 +116,9 @@ type GraphClient interface {
 	PostComments(ctx context.Context, pageToken, postID string, limit int) ([]Comment, error)
 	PostInsights(ctx context.Context, pageToken, postID string, metrics []string) (InsightSet, error)
 	ScheduledPosts(ctx context.Context, pageToken, pageID string, limit int) ([]ScheduledPost, error)
+	// PageRatings reads the rating summary of a page and its latest
+	// recommendations, newest first.
+	PageRatings(ctx context.Context, pageToken, pageID string, limit int) (PageRatings, error)
 
 	// --- Facebook Page, write ---
 

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "message": "(#12) ratings edge is deprecated for versions v22.0 and higher",
+    "type": "OAuthException",
+    "code": 12,
+    "fbtrace_id": "AaBb12"
+  }
+}

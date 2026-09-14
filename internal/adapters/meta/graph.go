@@ -29,6 +29,12 @@ const (
 	// caller its numbers rather than the whole listing.
 	postFieldsPlain = "id,message,created_time,permalink_url"
 	commentFields   = "id,from{name},message,created_time"
+	// pageRatingFields is the rating summary carried by the Page node itself.
+	pageRatingFields = "overall_star_rating,rating_count"
+	// ratingFields is what /{page-id}/ratings is asked for. reviewer{name}
+	// is requested but Meta only fills it for authors who granted the app
+	// access, so the name is usually absent.
+	ratingFields    = "created_time,recommendation_type,rating,review_text,reviewer{name}"
 	igCommentFields = "id,username,text,timestamp"
 	igMediaFields   = "id,caption,media_type,media_product_type,timestamp,permalink," +
 		"like_count,comments_count," +
@@ -462,4 +468,78 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// codeDeprecated is what Meta answers for an edge it has retired. The
+// changelog announces it for /ratings since v22.0, yet the edge still serves
+// data on v26.0 for a page the user administers. The code is handled anyway,
+// so the rating summary survives the day Meta enforces the deprecation.
+const codeDeprecated = 12
+
+// ratingsUnavailable is the sentence the caller reads when Meta refuses the
+// list of reviews while the summary could still be read.
+const ratingsUnavailable = "Meta ne sert plus la liste des avis sur cette version de l'API (édition retirée depuis la v22.0) ; seuls la note moyenne et le nombre d'avis restent lisibles."
+
+// pageRatingSummary is the rating part of a Page node.
+type pageRatingSummary struct {
+	OverallStarRating float64 `json:"overall_star_rating"`
+	RatingCount       int64   `json:"rating_count"`
+}
+
+// ratingItem is one entry of /{page-id}/ratings.
+type ratingItem struct {
+	CreatedTime        string `json:"created_time"`
+	RecommendationType string `json:"recommendation_type"`
+	Rating             int    `json:"rating"`
+	ReviewText         string `json:"review_text"`
+	Reviewer           struct {
+		Name string `json:"name"`
+	} `json:"reviewer"`
+}
+
+// PageRatings reads the rating summary of a page, then its recommendations.
+//
+// Two requests on purpose: the summary lives on the Page node while the
+// reviews are an edge Meta has announced as deprecated. Keeping them apart
+// means a refused edge costs the caller the list, never the average.
+func (c *Client) PageRatings(ctx context.Context, pageToken, pageID string, limit int) (domain.PageRatings, error) {
+	var summary pageRatingSummary
+	if err := c.get(ctx, pageToken, pageID, url.Values{"fields": {pageRatingFields}}, &summary); err != nil {
+		return domain.PageRatings{}, fmt.Errorf("note de la page: %w", err)
+	}
+	out := domain.PageRatings{
+		PageID:            pageID,
+		OverallStarRating: summary.OverallStarRating,
+		RatingCount:       summary.RatingCount,
+		Recommendations:   []domain.Recommendation{},
+	}
+
+	params := url.Values{
+		"fields": {ratingFields},
+		"limit":  {strconv.Itoa(pageSize(limit))},
+	}
+	items, err := c.collect(ctx, pageToken, pageID+"/ratings", params, limit)
+	if err != nil {
+		// Only the deprecation is tolerated: an expired token or a quota is
+		// a real failure and must reach the caller.
+		if ge, ok := domain.AsGraphError(err); ok && ge.Code == codeDeprecated {
+			out.RecommendationsUnavailable = ratingsUnavailable
+			return out, nil
+		}
+		return domain.PageRatings{}, fmt.Errorf("avis de la page: %w", err)
+	}
+	for _, raw := range items {
+		var item ratingItem
+		if err := json.Unmarshal(raw, &item); err != nil {
+			return domain.PageRatings{}, fmt.Errorf("décodage d'un avis: %w", err)
+		}
+		out.Recommendations = append(out.Recommendations, domain.Recommendation{
+			CreatedTime: item.CreatedTime,
+			Type:        item.RecommendationType,
+			Rating:      item.Rating,
+			ReviewText:  item.ReviewText,
+			Reviewer:    item.Reviewer.Name,
+		})
+	}
+	return out, nil
 }

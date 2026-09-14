@@ -301,6 +301,7 @@ Ask *"list my pages"*: `list_pages` should answer with the Pages of that account
 | `page_insights_metadata` | Catalogue of metric names the server knows how to request |
 | `page_posts` | Recent posts with clicks, reactions and video views |
 | `page_post_comments` | Comments on a post |
+| `page_ratings` | Star average, public rating count and latest recommendations of a Page |
 | `ig_account_insights` | Reach, views, profile views, engaged accounts, interactions, followers |
 | `ig_follower_demographics` | Follower breakdown by `city`, `country`, `age` or `gender` |
 | `ig_media` | Recent Instagram media with reach, views, saves, shares, interactions |
@@ -326,6 +327,14 @@ object. Rather than failing, the server retries metric by metric and returns wha
 could read, listing the rest under `rejected`. `page_insights_metadata` is a
 maintained catalogue in the code, not a live capability check: the
 `/insights/metadata` endpoint no longer answers, so `rejected` is the real signal.
+
+Meta's changelog lists `/{page-id}/ratings` as deprecated since v22.0, yet the edge
+still answers on v26.0 for a Page the user administers, with `pages_read_user_content`.
+`page_ratings` asks anyway and, should Meta start refusing it (error code 12), keeps
+the average and the count and explains the empty list under
+`recommendations_unavailable`. Recent Facebook reviews carry no stars, only a
+`positive` or `negative` recommendation, and `rating_count` only counts public ones,
+so it can be `0` above a non-empty list.
 
 ### Write
 

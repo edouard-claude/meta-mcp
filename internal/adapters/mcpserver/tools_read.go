@@ -52,6 +52,13 @@ func (d *deps) registerReadTools(srv *mcp.Server) {
 	}, d.toolPagePostComments)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "page_ratings",
+		Title:       "Avis d'une page",
+		Description: "Note moyenne (1 à 5), nombre d'avis publics et derniers avis d'une Page Facebook : recommandation positive ou négative, texte, date. Les avis Facebook récents n'ont pas d'étoiles, seulement un sens (positive/negative) ; rating_count ne compte que les avis publics et peut valoir 0 alors que des avis sont listés. Si Meta retire la liste, le champ recommendations_unavailable l'explique et la note reste lisible.",
+		Annotations: readOnly(),
+	}, d.toolPageRatings)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "ig_account_insights",
 		Title:       "Statistiques Instagram",
 		Description: "Statistiques du compte Instagram professionnel lié à une page : couverture, vues, visites de profil, comptes engagés, interactions et abonnés. Les métriques que Meta refuse sont listées dans le champ rejected au lieu de faire échouer l'appel.",
@@ -323,4 +330,27 @@ func (d *deps) toolReconnectURL(ctx context.Context, req *mcp.CallToolRequest, _
 		return nil, nil, d.toolError("reconnect_url", err)
 	}
 	return jsonResult(map[string]string{"url": url})
+}
+
+// ----- page_ratings -----
+
+// PageRatingsArgs are the arguments of page_ratings.
+type PageRatingsArgs struct {
+	PageID string `json:"page_id" jsonschema:"Identifiant de la Page Facebook, obtenu via list_pages."`
+	Limit  int    `json:"limit,omitempty" jsonschema:"Nombre maximum d'avis, les plus récents d'abord, 25 par défaut, 100 au maximum."`
+}
+
+func (d *deps) toolPageRatings(ctx context.Context, req *mcp.CallToolRequest, args PageRatingsArgs) (*mcp.CallToolResult, any, error) {
+	tenant, err := tenantID(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	ratings, err := d.svc.PageRatings(ctx, tenant, app.PageRatingsInput{
+		PageID: args.PageID,
+		Limit:  args.Limit,
+	})
+	if err != nil {
+		return nil, nil, d.toolError("page_ratings", err)
+	}
+	return jsonResult(ratings)
 }

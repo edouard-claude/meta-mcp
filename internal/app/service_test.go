@@ -770,3 +770,43 @@ func (f *fakeGraph) SetCommentHidden(_ context.Context, token, commentID string,
 func (f *fakeGraph) DeleteObject(_ context.Context, token, objectID string) error {
 	return f.record(graphCall{Method: "DeleteObject", Token: token, Object: objectID})
 }
+
+func (f *fakeGraph) PageRatings(_ context.Context, token, pageID string, limit int) (domain.PageRatings, error) {
+	if err := f.record(graphCall{Method: "PageRatings", Token: token, Object: pageID, Limit: limit}); err != nil {
+		return domain.PageRatings{}, err
+	}
+	return domain.PageRatings{PageID: pageID, OverallStarRating: 4.5, RatingCount: 3,
+		Recommendations: []domain.Recommendation{}}, nil
+}
+
+func TestPageRatingsIsTenantScopedAndBounded(t *testing.T) {
+	svc, _, graph, _ := newServiceHarness(t)
+
+	got, err := svc.PageRatings(t.Context(), "tenant-a", PageRatingsInput{PageID: "page-a"})
+	if err != nil {
+		t.Fatalf("PageRatings: %v", err)
+	}
+	if got.PageID != "page-a" || got.OverallStarRating != 4.5 || got.RatingCount != 3 {
+		t.Fatalf("avis = %+v", got)
+	}
+	if last := graph.last(); last.Method != "PageRatings" || last.Token != "PT-A" || last.Limit != defaultRatingLimit {
+		t.Fatalf("appel Graph = %+v", last)
+	}
+
+	if _, err := svc.PageRatings(t.Context(), "tenant-a", PageRatingsInput{PageID: "page-a", Limit: 5000}); err != nil {
+		t.Fatalf("PageRatings: %v", err)
+	}
+	if got := graph.last().Limit; got != maxRatingLimit {
+		t.Fatalf("limite plafonnée = %d", got)
+	}
+
+	// A page of another tenant is unknown, never forbidden, and costs no
+	// Graph call.
+	before := len(graph.calls)
+	if _, err := svc.PageRatings(t.Context(), "tenant-b", PageRatingsInput{PageID: "page-a"}); !errors.Is(err, domain.ErrUnknownPage) {
+		t.Fatalf("erreur = %v", err)
+	}
+	if len(graph.calls) != before {
+		t.Fatalf("appel Graph vers un autre tenant: %+v", graph.last())
+	}
+}

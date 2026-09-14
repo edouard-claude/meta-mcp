@@ -218,3 +218,15 @@ func (f *fakeGraph) SetCommentHidden(_ context.Context, token, commentID string,
 func (f *fakeGraph) DeleteObject(_ context.Context, token, objectID string) error {
 	return f.record("DeleteObject", token, objectID)
 }
+
+func (f *fakeGraph) PageRatings(_ context.Context, token, pageID string, _ int) (domain.PageRatings, error) {
+	if err := f.record("PageRatings", token, pageID); err != nil {
+		return domain.PageRatings{}, err
+	}
+	return domain.PageRatings{
+		PageID: pageID, OverallStarRating: 4.2, RatingCount: 12,
+		Recommendations: []domain.Recommendation{{
+			CreatedTime: "2026-09-01T08:00:00+0000", Type: "positive", ReviewText: "Parfait",
+		}},
+	}, nil
+}

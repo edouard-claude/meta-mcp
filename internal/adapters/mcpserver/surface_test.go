@@ -11,7 +11,7 @@ import (
 var allTools = []string{
 	// read
 	"list_pages", "sync_pages", "page_insights", "page_insights_metadata",
-	"page_posts", "page_post_comments", "ig_account_insights",
+	"page_posts", "page_post_comments", "page_ratings", "ig_account_insights",
 	"ig_follower_demographics", "ig_media", "ig_media_comments", "reconnect_url",
 	// detail and diagnostics
 	"connection_status", "page_post_insights", "ig_media_insights",

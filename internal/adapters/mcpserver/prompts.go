@@ -40,9 +40,11 @@ Marche à suivre :
    Si le champ "rejected" est non vide, dis-le : ces métriques n'ont pas pu être lues.
 3. page_posts sur la période, puis page_post_insights sur les trois publications
    les plus vues pour expliquer ce qui a marché.
-4. Si un compte Instagram est lié : ig_account_insights, ig_media, et
+4. page_ratings pour la note moyenne et les avis reçus sur le mois : signale
+   chaque avis négatif, il appelle une réponse.
+5. Si un compte Instagram est lié : ig_account_insights, ig_media, et
    ig_follower_demographics avec breakdown=city pour situer l'audience.
-5. Rédige le bilan en français : évolution chiffrée par rapport au mois précédent,
+6. Rédige le bilan en français : évolution chiffrée par rapport au mois précédent,
    ce qui a le mieux fonctionné et pourquoi, ce qui a décroché, et deux ou trois
    recommandations concrètes.
 

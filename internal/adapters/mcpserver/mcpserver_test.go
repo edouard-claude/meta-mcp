@@ -161,7 +161,7 @@ func TestToolsAreListed(t *testing.T) {
 	}
 	for _, want := range []string{
 		"list_pages", "sync_pages", "page_insights", "page_insights_metadata",
-		"page_posts", "page_post_comments", "ig_account_insights",
+		"page_posts", "page_post_comments", "page_ratings", "ig_account_insights",
 		"ig_follower_demographics", "ig_media", "ig_media_comments", "reconnect_url",
 	} {
 		if !names[want] {
@@ -390,5 +390,33 @@ func TestUnknownTokenIsRejected(t *testing.T) {
 	}, nil)
 	if err == nil {
 		t.Fatal("un jeton inconnu a été accepté")
+	}
+}
+
+func TestPageRatingsUsesThePageToken(t *testing.T) {
+	h := newServerHarness(t)
+
+	payload, isErr := call(t, h.connect(t, "token-a"), "page_ratings",
+		map[string]any{"page_id": "page-a", "limit": 5})
+	if isErr {
+		t.Fatalf("erreur: %s", payload)
+	}
+	got := decodeJSON[domain.PageRatings](t, payload)
+	if got.OverallStarRating != 4.2 || got.RatingCount != 12 ||
+		len(got.Recommendations) != 1 || got.Recommendations[0].Type != "positive" {
+		t.Fatalf("avis = %+v", got)
+	}
+	calls := h.graph.recorded()
+	if last := calls[len(calls)-1]; last.Method != "PageRatings" || last.Token != "PT-A" || last.Object != "page-a" {
+		t.Fatalf("appel Graph = %+v", last)
+	}
+
+	// Tenant B does not own page-a: unknown, never forbidden.
+	payload, isErr = call(t, h.connect(t, "token-b"), "page_ratings", map[string]any{"page_id": "page-a"})
+	if !isErr || !strings.Contains(payload, "page inconnue") {
+		t.Fatalf("page d'un autre tenant acceptée: %s", payload)
+	}
+	if len(h.graph.recorded()) != 1 {
+		t.Fatalf("appel Graph vers un autre tenant: %+v", h.graph.recorded())
 	}
 }

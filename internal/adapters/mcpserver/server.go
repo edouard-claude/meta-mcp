@@ -18,7 +18,7 @@ import (
 
 const (
 	serverName    = "metasocial-mcp"
-	serverVersion = "v1.0.0"
+	serverVersion = "v1.1.0"
 	serverTitle   = "Facebook & Instagram organique"
 )
 
@@ -66,9 +66,9 @@ Commencez par list_pages pour obtenir les page_id disponibles ; tous les
 autres outils en ont besoin. sync_pages rafraîchit cette liste depuis Meta.
 
 Les outils de lecture couvrent les statistiques de page (page_insights,
-page_insights_metadata), les publications (page_posts, page_post_comments) et
-Instagram (ig_account_insights, ig_follower_demographics, ig_media,
-ig_media_comments). Les dates since/until sont au format AAAA-MM-JJ et
+page_insights_metadata), les publications (page_posts, page_post_comments), les
+avis (page_ratings) et Instagram (ig_account_insights, ig_follower_demographics,
+ig_media, ig_media_comments). Les dates since/until sont au format AAAA-MM-JJ et
 couvrent les 28 derniers jours par défaut.
 
 Les outils d'écriture (page_publish_post, page_reply_comment, ig_publish,
